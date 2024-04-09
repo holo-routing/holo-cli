@@ -21,7 +21,7 @@ tokio = { version = "1.0", features = ["full"] }
 tonic = { version = "0.11", features = ["tls"] }
 yang2 = { version = "0.9", features = ["bundled"] }
 
-holo-yang = { path = "../holo/holo-yang" }
+holo-yang = "0.4.0"
 
 [build-dependencies]
 tonic-build = "0.11"
