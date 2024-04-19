@@ -10,9 +10,9 @@ use std::sync::{Arc, Mutex};
 use indextree::NodeId;
 use itertools::Itertools;
 use reedline::{
-    ColumnarMenu, Completer, FileBackedHistory, KeyCode, KeyModifiers, Prompt,
-    PromptEditMode, PromptHistorySearch, PromptHistorySearchStatus, Reedline,
-    ReedlineEvent, ReedlineMenu, Span, Suggestion, Vi,
+    ColumnarMenu, Completer, FileBackedHistory, KeyCode, KeyModifiers, MenuBuilder, Prompt,
+    PromptEditMode, PromptHistorySearch, PromptHistorySearchStatus, Reedline, ReedlineEvent,
+    ReedlineMenu, Span, Suggestion, Vi,
 };
 
 use crate::error::ParserError;
@@ -52,10 +52,7 @@ impl Prompt for CliPrompt {
         Cow::Borrowed("")
     }
 
-    fn render_prompt_indicator(
-        &self,
-        _edit_mode: PromptEditMode,
-    ) -> Cow<'_, str> {
+    fn render_prompt_indicator(&self, _edit_mode: PromptEditMode) -> Cow<'_, str> {
         DEFAULT_PROMPT_INDICATOR.into()
     }
 
@@ -92,31 +89,21 @@ impl Completer for CliCompleter {
             .unwrap_or(false);
 
         let wd_token_id = cli.session.mode().token(&cli.commands);
-        let completions = match parser::parse_command_try(
-            &cli.session,
-            &cli.commands,
-            wd_token_id,
-            line,
-        ) {
-            Ok(ParsedCommand { token_id, .. })
-            | Err(ParserError::Incomplete(token_id)) => {
-                if partial {
-                    complete_add_token(
-                        &cli.commands,
-                        token_id,
-                        partial,
-                        last_word,
-                    )
-                } else {
-                    let token_ids = token_id.children(&cli.commands.arena);
+        let completions =
+            match parser::parse_command_try(&cli.session, &cli.commands, wd_token_id, line) {
+                Ok(ParsedCommand { token_id, .. }) | Err(ParserError::Incomplete(token_id)) => {
+                    if partial {
+                        complete_add_token(&cli.commands, token_id, partial, last_word)
+                    } else {
+                        let token_ids = token_id.children(&cli.commands.arena);
+                        complete_add_tokens(&cli.commands, partial, token_ids)
+                    }
+                }
+                Err(ParserError::Ambiguous(token_ids)) => {
                     complete_add_tokens(&cli.commands, partial, token_ids)
                 }
-            }
-            Err(ParserError::Ambiguous(token_ids)) => {
-                complete_add_tokens(&cli.commands, partial, token_ids)
-            }
-            _ => vec![],
-        };
+                _ => vec![],
+            };
 
         completions
             .into_iter()
@@ -129,6 +116,7 @@ impl Completer for CliCompleter {
                     end: pos,
                 },
                 append_whitespace: true,
+                style: None,
             })
             .collect()
     }
@@ -136,26 +124,31 @@ impl Completer for CliCompleter {
 
 // ===== global functions =====
 
-pub(crate) fn reedline_init(
-    cli: Arc<Mutex<Cli>>,
-    use_ansi_coloring: bool,
-) -> Reedline {
+pub(crate) fn reedline_init(cli: Arc<Mutex<Cli>>, use_ansi_coloring: bool) -> Reedline {
     let history = Box::new(
-        FileBackedHistory::with_file(
-            DEFAULT_HISTORY_SIZE,
-            DEFAULT_HISTORY_FILENAME.into(),
-        )
-        .expect("Error configuring history with file"),
+        FileBackedHistory::with_file(DEFAULT_HISTORY_SIZE, DEFAULT_HISTORY_FILENAME.into())
+            .expect("Error configuring history with file"),
     );
     let completer = Box::new(CliCompleter(cli));
-    let completion_menu =
-        Box::new(ColumnarMenu::default().with_name("completion_menu"));
+    let completion_menu = Box::new(ColumnarMenu::default().with_name("completion_menu"));
 
     let mut insert_keybindings = reedline::default_vi_insert_keybindings();
     let normal_keybindings = reedline::default_vi_normal_keybindings();
+
+    // <Tab> as completion trigger
     insert_keybindings.add_binding(
         KeyModifiers::NONE,
         KeyCode::Tab,
+        ReedlineEvent::UntilFound(vec![
+            ReedlineEvent::Menu("completion_menu".to_string()),
+            ReedlineEvent::MenuNext,
+        ]),
+    );
+
+    // <?> as completion trigger
+    insert_keybindings.add_binding(
+        KeyModifiers::NONE,
+        KeyCode::Char('?'),
         ReedlineEvent::UntilFound(vec![
             ReedlineEvent::Menu("completion_menu".to_string()),
             ReedlineEvent::MenuNext,
