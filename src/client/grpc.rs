@@ -76,7 +76,10 @@ impl Client for GrpcClient {
             .expect("Failed to obtain a new runtime object");
 
         // Connect to holod.
-        let client = runtime.block_on(NorthboundClient::connect(dest))?;
+        let client = runtime
+            .block_on(NorthboundClient::connect(dest))?
+            .max_encoding_message_size(usize::MAX)
+            .max_decoding_message_size(usize::MAX);
 
         Ok(GrpcClient { client, runtime })
     }
