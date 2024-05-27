@@ -64,7 +64,8 @@ fn add_tokens(
 
     match snode.kind() {
         SchemaNodeKind::Leaf | SchemaNodeKind::LeafList
-            if snode.base_type() != Some(DataValueType::Empty) =>
+            if snode.leaf_type().unwrap().base_type()
+                != DataValueType::Empty =>
         {
             // Add input token.
             add_token(commands, token_id, snode, TokenKind::String, true);
@@ -102,7 +103,7 @@ fn is_full_command(snode: &SchemaNode<'_>, is_argument: bool) -> bool {
     match snode.kind() {
         SchemaNodeKind::Container => !snode.is_np_container(),
         SchemaNodeKind::Leaf => {
-            if snode.base_type() == Some(DataValueType::Empty) {
+            if snode.leaf_type().unwrap().base_type() == DataValueType::Empty {
                 true
             } else if snode.is_list_key() {
                 match snode.siblings().next() {
