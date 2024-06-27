@@ -41,6 +41,7 @@ fn page_output(session: &Session, data: &str) -> Result<(), std::io::Error> {
         let mut pager = Command::new("less")
             // Exit immediately if the data fits on one screen.
             .arg("-F")
+            .arg("-X")
             .stdin(Stdio::piped())
             .spawn()?;
 
