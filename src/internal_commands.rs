@@ -5,13 +5,16 @@
 //
 
 use std::fmt::Write;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 
 use holo_yang::YANG_CTX;
 use indextree::NodeId;
 use prettytable::{format, row, Table};
 use similar::TextDiff;
-use yang2::data::{Data, DataFormat, DataNodeRef, DataPrinterFlags, DataTree};
+use yang2::data::{
+    Data, DataFormat, DataNodeRef, DataParserFlags, DataPrinterFlags, DataTree,
+    DataValidationFlags,
+};
 use yang2::schema::SchemaNodeKind;
 
 use crate::client::DataType;
@@ -34,17 +37,22 @@ fn get_opt_arg(args: &mut ParsedArgs, name: &str) -> Option<String> {
     None
 }
 
+fn pager() -> Result<Child, std::io::Error> {
+    Command::new("less")
+        // Exit immediately if the data fits on one screen.
+        .arg("-F")
+        // Do not clear the screen on exit.
+        .arg("-X")
+        .stdin(Stdio::piped())
+        .spawn()
+}
+
 fn page_output(session: &Session, data: &str) -> Result<(), std::io::Error> {
     if session.use_pager() {
         use std::io::Write;
 
         // Spawn the pager process.
-        let mut pager = Command::new("less")
-            // Exit immediately if the data fits on one screen.
-            .arg("-F")
-            .arg("-X")
-            .stdin(Stdio::piped())
-            .spawn()?;
+        let mut pager = pager()?;
 
         // Feed the data to the pager.
         pager.stdin.as_mut().unwrap().write_all(data.as_bytes())?;
@@ -57,6 +65,75 @@ fn page_output(session: &Session, data: &str) -> Result<(), std::io::Error> {
     }
 
     Ok(())
+}
+
+fn page_table(session: &Session, table: &Table) -> Result<(), std::io::Error> {
+    if table.is_empty() {
+        return Ok(());
+    }
+
+    if session.use_pager() {
+        use std::io::Write;
+
+        // Spawn the pager process.
+        let mut pager = pager()?;
+
+        // Print the table.
+        let mut output = Vec::new();
+        table.print(&mut output)?;
+        writeln!(output)?;
+
+        // Feed the data to the pager.
+        pager.stdin.as_mut().unwrap().write_all(&output)?;
+
+        // Wait for the pager process to finish.
+        pager.wait()?;
+    } else {
+        // Print the table directly to the console.
+        table.printstd();
+        println!();
+    }
+
+    Ok(())
+}
+
+fn fetch_data(
+    session: &mut Session,
+    data_type: DataType,
+    xpath: &str,
+) -> Result<DataTree, String> {
+    let yang_ctx = YANG_CTX.get().unwrap();
+    let data = session
+        .get(data_type, DataFormat::XML, true, Some(xpath.to_owned()))
+        .map_err(|error| format!("% failed to fetch state data: {}", error))?;
+    DataTree::parse_string(
+        yang_ctx,
+        &data,
+        DataFormat::XML,
+        DataParserFlags::NO_VALIDATION,
+        DataValidationFlags::PRESENT,
+    )
+    .map_err(|error| format!("% failed to parse data: {}", error))
+}
+
+// ===== impl DataNodeRef =====
+
+/// Extension methods for DataNodeRef.
+pub trait DataNodeRefExt {
+    fn child_value(&self, name: &str) -> String;
+    fn child_opt_value(&self, name: &str) -> Option<String>;
+}
+
+impl<'a> DataNodeRefExt for DataNodeRef<'a> {
+    fn child_value(&self, name: &str) -> String {
+        self.child_opt_value(name).unwrap_or("-".to_owned())
+    }
+
+    fn child_opt_value(&self, name: &str) -> Option<String> {
+        self.children()
+            .find(|dnode| dnode.schema().name() == name)
+            .map(|dnode| dnode.value_canonical().unwrap())
+    }
 }
 
 // ===== "configure" =====
@@ -435,6 +512,388 @@ pub(crate) fn cmd_show_yang_modules(
     println!();
     table.printstd();
     println!();
+
+    Ok(false)
+}
+
+// ===== OSPFv2 "show" commands =====
+
+pub(crate) fn cmd_show_ospfv2_interface(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    // Parse arguments.
+    let name = get_opt_arg(&mut args, "name");
+
+    // Fetch data.
+    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+    let xpath_instance = concat!(
+        "/ietf-routing:routing/control-plane-protocols/",
+        "control-plane-protocol[type='ietf-ospf:ospfv2']",
+    );
+    let xpath_area = "ietf-ospf:ospf/areas/area";
+    let mut xpath_iface = "interfaces/interface".to_owned();
+    if let Some(name) = &name {
+        xpath_iface = format!("{}[name='{}']", xpath_iface, name);
+    }
+    let data = fetch_data(session, DataType::All, xpath_req)?;
+
+    // Create the table.
+    let mut table = Table::new();
+    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+    table.set_titles(row![
+        "Instance",
+        "Area",
+        "Name",
+        "Type",
+        "State",
+        "Priority",
+        "Cost",
+        "Hello Interval (s)",
+    ]);
+
+    // Iterate over OSPF instances.
+    for dnode in data.find_xpath(xpath_instance).unwrap() {
+        let instance = dnode.child_value("name");
+
+        // Iterate over OSPF areas.
+        for dnode in dnode.find_xpath(xpath_area).unwrap() {
+            let area = dnode.child_value("area-id");
+
+            // Iterate over OSPF interfaces.
+            for dnode in dnode.find_xpath(&xpath_iface).unwrap() {
+                // Add table row.
+                table.add_row(row![
+                    instance,
+                    area,
+                    dnode.child_value("name"),
+                    dnode.child_value("interface-type"),
+                    dnode.child_value("state"),
+                    dnode.child_value("priority"),
+                    dnode.child_value("cost"),
+                    format!(
+                        "{} ({})",
+                        dnode.child_value("hello-interval"),
+                        dnode
+                            .child_opt_value("hello-timer")
+                            .map(|timer| format!("due in {}", timer))
+                            .unwrap_or("inactive".to_owned())
+                    )
+                ]);
+            }
+        }
+    }
+
+    // Print the table to stdout.
+    if let Err(error) = page_table(session, &table) {
+        println!("% failed to display data: {}", error)
+    }
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_ospfv2_interface_detail(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let mut output = String::new();
+
+    // Parse arguments.
+    let name = get_opt_arg(&mut args, "name");
+
+    // Fetch data.
+    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+    let xpath_instance = concat!(
+        "/ietf-routing:routing/control-plane-protocols/",
+        "control-plane-protocol[type='ietf-ospf:ospfv2']",
+    );
+    let xpath_area = "ietf-ospf:ospf/areas/area";
+    let mut xpath_iface = "interfaces/interface".to_owned();
+    if let Some(name) = &name {
+        xpath_iface = format!("{}[name='{}']", xpath_iface, name);
+    }
+    let data = fetch_data(session, DataType::All, xpath_req)?;
+
+    // Iterate over OSPF instances.
+    for dnode in data.find_xpath(xpath_instance).unwrap() {
+        let instance = dnode.child_value("name");
+
+        // Iterate over OSPF areas.
+        for dnode in dnode.find_xpath(xpath_area).unwrap() {
+            let area = dnode.child_value("area-id");
+
+            // Iterate over OSPF interfaces.
+            for dnode in dnode.find_xpath(&xpath_iface).unwrap() {
+                writeln!(output, "{}", dnode.child_value("name")).unwrap();
+                writeln!(output, " instance: {}", instance).unwrap();
+                writeln!(output, " area: {}", area).unwrap();
+                for dnode in dnode
+                    .children()
+                    .filter(|dnode| !dnode.schema().is_list_key())
+                {
+                    let snode = dnode.schema();
+                    let snode_name = snode.name();
+                    if let Some(value) = dnode.value_canonical() {
+                        writeln!(output, " {}: {}", snode_name, value).unwrap();
+                    } else if snode_name == "statistics" {
+                        writeln!(output, " statistics").unwrap();
+                        for dnode in dnode.children() {
+                            let snode = dnode.schema();
+                            let snode_name = snode.name();
+                            if let Some(value) = dnode.value_canonical() {
+                                writeln!(output, "  {}: {}", snode_name, value)
+                                    .unwrap();
+                            }
+                        }
+                    }
+                }
+                writeln!(output).unwrap();
+            }
+        }
+    }
+
+    if let Err(error) = page_output(session, &output) {
+        println!("% failed to print data: {}", error)
+    }
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_ospfv2_neighbor(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    // Parse arguments.
+    let router_id = get_opt_arg(&mut args, "router_id");
+
+    // Fetch data.
+    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+    let xpath_instance = concat!(
+        "/ietf-routing:routing/control-plane-protocols/",
+        "control-plane-protocol[type='ietf-ospf:ospfv2']",
+    );
+    let xpath_area = "ietf-ospf:ospf/areas/area";
+    let xpath_iface = "interfaces/interface";
+    let mut xpath_nbr = "neighbors/neighbor".to_owned();
+    if let Some(router_id) = &router_id {
+        xpath_nbr =
+            format!("{}[neighbor-router-id='{}']", xpath_nbr, router_id);
+    }
+    let data = fetch_data(session, DataType::All, xpath_req)?;
+
+    // Create the table.
+    let mut table = Table::new();
+    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+    table.set_titles(row![
+        "Instance",
+        "Area",
+        "Interface",
+        "Router ID",
+        "Address",
+        "State",
+        "Dead Interval (s)",
+    ]);
+
+    // Iterate over OSPF instances.
+    for dnode in data.find_xpath(xpath_instance).unwrap() {
+        let instance = dnode.child_value("name");
+
+        // Iterate over OSPF areas.
+        for dnode in dnode.find_xpath(xpath_area).unwrap() {
+            let area = dnode.child_value("area-id");
+
+            // Iterate over OSPF interfaces.
+            for dnode in dnode.find_xpath(xpath_iface).unwrap() {
+                let ifname = dnode.child_value("name");
+                let dead_interval = dnode.child_value("dead-interval");
+
+                // Iterate over OSPF neighbors.
+                for dnode in dnode.find_xpath(&xpath_nbr).unwrap() {
+                    // Add table row.
+                    table.add_row(row![
+                        instance,
+                        area,
+                        ifname,
+                        dnode.child_value("neighbor-router-id"),
+                        dnode.child_value("address"),
+                        dnode.child_value("state"),
+                        format!(
+                            "{} (due in {})",
+                            dead_interval,
+                            dnode.child_value("dead-timer")
+                        )
+                    ]);
+                }
+            }
+        }
+    }
+
+    // Print the table to stdout.
+    if let Err(error) = page_table(session, &table) {
+        println!("% failed to display data: {}", error)
+    }
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_ospfv2_neighbor_detail(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let mut output = String::new();
+
+    // Parse arguments.
+    let router_id = get_opt_arg(&mut args, "router_id");
+
+    // Fetch data.
+    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+    let xpath_instance = concat!(
+        "/ietf-routing:routing/control-plane-protocols/",
+        "control-plane-protocol[type='ietf-ospf:ospfv2']",
+    );
+    let xpath_area = "ietf-ospf:ospf/areas/area";
+    let xpath_iface = "interfaces/interface";
+    let mut xpath_nbr = "neighbors/neighbor".to_owned();
+    if let Some(router_id) = &router_id {
+        xpath_nbr =
+            format!("{}[neighbor-router-id='{}']", xpath_nbr, router_id);
+    }
+    let data = fetch_data(session, DataType::All, xpath_req)?;
+
+    // Iterate over OSPF instances.
+    for dnode in data.find_xpath(xpath_instance).unwrap() {
+        let instance = dnode.child_value("name");
+
+        // Iterate over OSPF areas.
+        for dnode in dnode.find_xpath(xpath_area).unwrap() {
+            let area = dnode.child_value("area-id");
+
+            // Iterate over OSPF interfaces.
+            for dnode in dnode.find_xpath(xpath_iface).unwrap() {
+                let ifname = dnode.child_value("name");
+
+                // Iterate over OSPF neighbors.
+                for dnode in dnode.find_xpath(&xpath_nbr).unwrap() {
+                    writeln!(
+                        output,
+                        "{}",
+                        dnode.child_value("neighbor-router-id")
+                    )
+                    .unwrap();
+                    writeln!(output, " instance: {}", instance).unwrap();
+                    writeln!(output, " area: {}", area).unwrap();
+                    writeln!(output, " interface: {}", ifname).unwrap();
+                    for dnode in dnode
+                        .children()
+                        .filter(|dnode| !dnode.schema().is_list_key())
+                    {
+                        let snode = dnode.schema();
+                        let snode_name = snode.name();
+                        if let Some(value) = dnode.value_canonical() {
+                            writeln!(output, " {}: {}", snode_name, value)
+                                .unwrap();
+                        } else if snode_name == "statistics"
+                            || snode_name == "graceful-restart"
+                        {
+                            writeln!(output, " statistics").unwrap();
+                            for dnode in dnode.children() {
+                                let snode = dnode.schema();
+                                let snode_name = snode.name();
+                                if let Some(value) = dnode.value_canonical() {
+                                    writeln!(
+                                        output,
+                                        "  {}: {}",
+                                        snode_name, value
+                                    )
+                                    .unwrap();
+                                }
+                            }
+                        }
+                    }
+                    writeln!(output).unwrap();
+                }
+            }
+        }
+    }
+
+    if let Err(error) = page_output(session, &output) {
+        println!("% failed to print data: {}", error)
+    }
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_ospfv2_route(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    // Parse arguments.
+    let prefix = get_opt_arg(&mut args, "prefix");
+
+    // Fetch data.
+    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+    let xpath_instance = concat!(
+        "/ietf-routing:routing/control-plane-protocols/",
+        "control-plane-protocol[type='ietf-ospf:ospfv2']",
+    );
+    let mut xpath_rib = "ietf-ospf:ospf/local-rib/route".to_owned();
+    if let Some(prefix) = &prefix {
+        xpath_rib = format!("{}[prefix='{}']", xpath_rib, prefix);
+    }
+    let data = fetch_data(session, DataType::All, xpath_req)?;
+
+    // Create the table.
+    let mut table = Table::new();
+    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+    table.set_titles(row![
+        "Instance",
+        "Prefix",
+        "Metric",
+        "Type",
+        "Tag",
+        "Nexthop Interface",
+        "Nexthop Address",
+    ]);
+
+    // Iterate over OSPF instances.
+    for dnode in data.find_xpath(xpath_instance).unwrap() {
+        let instance = dnode.child_value("name");
+
+        // Iterate over OSPF routes.
+        for dnode in dnode.find_xpath(&xpath_rib).unwrap() {
+            let prefix = dnode.child_value("prefix");
+            let metric = dnode.child_value("metric");
+            let route_type = dnode.child_value("route-type");
+            let tag = dnode.child_value("route-tag");
+            let mut first = true;
+
+            // Iterate over route nexthop.
+            for dnode in dnode.find_xpath("next-hops/next-hop").unwrap() {
+                // Add table row.
+                table.add_row(row![
+                    instance,
+                    if first { &prefix } else { "" },
+                    if first { &metric } else { "" },
+                    if first { &route_type } else { "" },
+                    if first { &tag } else { "" },
+                    dnode.child_value("outgoing-interface"),
+                    dnode.child_value("next-hop"),
+                ]);
+
+                first = false;
+            }
+        }
+    }
+
+    // Print the table to stdout.
+    if let Err(error) = page_table(session, &table) {
+        println!("% failed to display data: {}", error)
+    }
 
     Ok(false)
 }
