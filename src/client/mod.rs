@@ -12,6 +12,12 @@ use crate::error::Error;
 
 type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
+pub enum DataType {
+    All = 0,
+    Config = 1,
+    State = 2,
+}
+
 pub trait Client: Send + std::fmt::Debug {
     // Connect to the Holo daemon.
     fn connect(dest: &'static str) -> Result<Self, StdError>
@@ -21,8 +27,14 @@ pub trait Client: Send + std::fmt::Debug {
     // Retrieve and load all supported YANG modules.
     fn load_modules(&mut self, yang_ctx: &mut yang2::context::Context);
 
-    // Get the running configuration.
-    fn get_running_config(&mut self) -> DataTree;
+    // Retrieve configuration data, state data or both.
+    fn get(
+        &mut self,
+        data_type: DataType,
+        format: DataFormat,
+        with_defaults: bool,
+        xpath: Option<String>,
+    ) -> Result<String, Error>;
 
     // Validate the provided candidate configuration.
     fn validate_candidate(&mut self, candidate: &DataTree)
@@ -35,11 +47,4 @@ pub trait Client: Send + std::fmt::Debug {
         candidate: &DataTree,
         comment: Option<String>,
     ) -> Result<(), Error>;
-
-    // Get state data.
-    fn get_state(
-        &mut self,
-        xpath: Option<String>,
-        format: DataFormat,
-    ) -> Result<String, Error>;
 }

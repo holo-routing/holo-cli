@@ -6,11 +6,14 @@
 
 use derive_new::new;
 use enum_as_inner::EnumAsInner;
+use holo_yang::YANG_CTX;
 use indextree::NodeId;
-use yang2::data::{Data, DataFormat, DataTree, DataValidationFlags};
+use yang2::data::{
+    Data, DataFormat, DataParserFlags, DataTree, DataValidationFlags,
+};
 use yang2::schema::{SchemaNode, SchemaNodeKind};
 
-use crate::client::Client;
+use crate::client::{Client, DataType};
 use crate::error::Error;
 use crate::parser::ParsedArgs;
 use crate::token::Commands;
@@ -54,7 +57,18 @@ impl Session {
         use_pager: bool,
         mut client: Box<dyn Client>,
     ) -> Session {
-        let running = client.get_running_config();
+        let yang_ctx = YANG_CTX.get().unwrap();
+        let running = client
+            .get(DataType::Config, DataFormat::XML, false, None)
+            .unwrap();
+        let running = DataTree::parse_string(
+            yang_ctx,
+            &running,
+            DataFormat::XML,
+            DataParserFlags::empty(),
+            DataValidationFlags::PRESENT | DataValidationFlags::NO_STATE,
+        )
+        .expect("Failed to parse data tree");
 
         Session {
             hostname,
@@ -266,12 +280,14 @@ impl Session {
         }
     }
 
-    pub(crate) fn get_state(
+    pub(crate) fn get(
         &mut self,
-        xpath: Option<String>,
+        data_type: DataType,
         format: DataFormat,
+        with_defaults: bool,
+        xpath: Option<String>,
     ) -> Result<String, Error> {
-        self.client.get_state(xpath, format)
+        self.client.get(data_type, format, with_defaults, xpath)
     }
 }
 

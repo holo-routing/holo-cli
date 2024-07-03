@@ -14,6 +14,7 @@ use similar::TextDiff;
 use yang2::data::{Data, DataFormat, DataNodeRef, DataPrinterFlags, DataTree};
 use yang2::schema::SchemaNodeKind;
 
+use crate::client::DataType;
 use crate::parser::ParsedArgs;
 use crate::session::{CommandMode, ConfigurationType, Session};
 use crate::token::{Commands, TokenKind};
@@ -388,7 +389,7 @@ pub(crate) fn cmd_show_state(
         None => DataFormat::JSON,
     };
 
-    match session.get_state(xpath, format) {
+    match session.get(DataType::State, format, false, xpath) {
         Ok(data) => {
             if let Err(error) = page_output(session, &data) {
                 println!("% failed to print state data: {}", error)
