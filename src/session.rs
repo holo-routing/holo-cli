@@ -8,10 +8,10 @@ use derive_new::new;
 use enum_as_inner::EnumAsInner;
 use holo_yang::YANG_CTX;
 use indextree::NodeId;
-use yang2::data::{
+use yang3::data::{
     Data, DataFormat, DataParserFlags, DataTree, DataValidationFlags,
 };
-use yang2::schema::{SchemaNode, SchemaNodeKind};
+use yang3::schema::{SchemaNode, SchemaNodeKind};
 
 use crate::client::{Client, DataType};
 use crate::error::Error;
@@ -146,7 +146,7 @@ impl Session {
         negate: bool,
         snode: &SchemaNode<'_>,
         mut args: ParsedArgs,
-    ) -> Result<(), yang2::Error> {
+    ) -> Result<(), yang3::Error> {
         // Get data path and CLI path corresponding to the current node.
         let mut path = self.mode.data_path().unwrap_or_default();
         let mut cli_path = self.mode.cli_path().unwrap_or_default();
@@ -201,8 +201,8 @@ impl Session {
 
         // Get leaf/leaf-list's value.
         let value = match snode.kind() {
-            yang2::schema::SchemaNodeKind::Leaf
-            | yang2::schema::SchemaNodeKind::LeafList
+            yang3::schema::SchemaNodeKind::Leaf
+            | yang3::schema::SchemaNodeKind::LeafList
                 if !snode.is_list_key() =>
             {
                 if let Some((_, value)) = args.pop_front() {

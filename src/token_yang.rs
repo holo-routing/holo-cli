@@ -10,7 +10,7 @@ use std::os::raw::c_void;
 use holo_yang::YANG_CTX;
 use indextree::NodeId;
 use itertools::Itertools;
-use yang2::schema::{DataValueType, SchemaNode, SchemaNodeKind};
+use yang3::schema::{DataValueType, SchemaNode, SchemaNodeKind};
 
 use crate::parser::ParsedArgs;
 use crate::token::{Action, Commands, Token, TokenKind};

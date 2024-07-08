@@ -11,11 +11,11 @@ use holo_yang::YANG_CTX;
 use indextree::NodeId;
 use prettytable::{format, row, Table};
 use similar::TextDiff;
-use yang2::data::{
+use yang3::data::{
     Data, DataFormat, DataNodeRef, DataParserFlags, DataPrinterFlags, DataTree,
     DataValidationFlags,
 };
-use yang2::schema::SchemaNodeKind;
+use yang3::schema::SchemaNodeKind;
 
 use crate::client::DataType;
 use crate::parser::ParsedArgs;

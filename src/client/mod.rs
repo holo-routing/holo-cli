@@ -6,7 +6,7 @@
 
 pub mod grpc;
 
-use yang2::data::{DataFormat, DataTree};
+use yang3::data::{DataFormat, DataTree};
 
 use crate::error::Error;
 
@@ -25,7 +25,7 @@ pub trait Client: Send + std::fmt::Debug {
         Self: Sized;
 
     // Retrieve and load all supported YANG modules.
-    fn load_modules(&mut self, yang_ctx: &mut yang2::context::Context);
+    fn load_modules(&mut self, yang_ctx: &mut yang3::context::Context);
 
     // Retrieve configuration data, state data or both.
     fn get(

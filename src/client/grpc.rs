@@ -6,7 +6,7 @@
 
 use holo_yang as yang;
 use proto::northbound_client::NorthboundClient;
-use yang2::data::{
+use yang3::data::{
     Data, DataDiffFlags, DataFormat, DataPrinterFlags, DataTree,
 };
 
@@ -82,7 +82,7 @@ impl Client for GrpcClient {
         Ok(GrpcClient { client, runtime })
     }
 
-    fn load_modules(&mut self, yang_ctx: &mut yang2::context::Context) {
+    fn load_modules(&mut self, yang_ctx: &mut yang3::context::Context) {
         // Retrieve the set of capabilities supported by the daemon.
         let capabilities = self
             .rpc_sync_capabilities()
