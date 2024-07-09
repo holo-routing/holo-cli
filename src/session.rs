@@ -19,6 +19,8 @@ use crate::parser::ParsedArgs;
 use crate::token::Commands;
 use crate::token_yang;
 
+static DEFAULT_HOSTNAME: &str = "holo";
+
 #[derive(Debug)]
 pub struct Session {
     hostname: String,
@@ -52,11 +54,7 @@ pub enum ConfigurationType {
 // ===== impl Session =====
 
 impl Session {
-    pub(crate) fn new(
-        hostname: String,
-        use_pager: bool,
-        mut client: Box<dyn Client>,
-    ) -> Session {
+    pub(crate) fn new(use_pager: bool, mut client: Box<dyn Client>) -> Session {
         let yang_ctx = YANG_CTX.get().unwrap();
         let running = client
             .get(DataType::Config, DataFormat::XML, false, None)
@@ -71,7 +69,7 @@ impl Session {
         .expect("Failed to parse data tree");
 
         Session {
-            hostname,
+            hostname: DEFAULT_HOSTNAME.to_owned(),
             prompt: String::new(),
             use_pager,
             mode: CommandMode::Operational,
@@ -81,8 +79,13 @@ impl Session {
         }
     }
 
-    pub(crate) fn update_hostname(&mut self, hostname: &str) {
-        hostname.clone_into(&mut self.hostname);
+    pub(crate) fn update_hostname(&mut self) {
+        self.hostname = self
+            .running
+            .find_path("/ietf-system:system/ietf-system:hostname")
+            .ok()
+            .and_then(|dnode| dnode.value_canonical())
+            .unwrap_or(DEFAULT_HOSTNAME.to_owned());
         self.update_prompt();
     }
 
@@ -94,7 +97,7 @@ impl Session {
         self.use_pager
     }
 
-    pub(crate) fn update_prompt(&mut self) {
+    fn update_prompt(&mut self) {
         self.prompt = match &self.mode {
             CommandMode::Operational => self.hostname.clone(),
             CommandMode::Configure { nodes } => {
@@ -260,6 +263,9 @@ impl Session {
 
         // Replace the running configuration with the candidate configuration.
         self.running = candidate.duplicate().unwrap();
+
+        // Fetch hostname from running configuration and update the prompt.
+        self.update_hostname();
 
         Ok(())
     }

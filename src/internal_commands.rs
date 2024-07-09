@@ -235,18 +235,6 @@ pub(crate) fn cmd_list_root(commands: &Commands, top_token_id: &NodeId) {
     }
 }
 
-// ===== "hostname" =====
-
-pub(crate) fn cmd_hostname(
-    _commands: &Commands,
-    session: &mut Session,
-    mut args: ParsedArgs,
-) -> Result<bool, String> {
-    let hostname = get_arg(&mut args, "hostname");
-    session.update_hostname(&hostname);
-    Ok(false)
-}
-
 // ===== "pwd" =====
 
 pub(crate) fn cmd_pwd(

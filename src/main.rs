@@ -28,8 +28,6 @@ use crate::session::{CommandMode, Session};
 use crate::terminal::CliPrompt;
 use crate::token::{Action, Commands};
 
-static DEFAULT_HOSTNAME: &str = "holo";
-
 pub struct Cli {
     commands: Commands,
     session: Session,
@@ -38,14 +36,13 @@ pub struct Cli {
 // ===== impl Cli =====
 
 impl Cli {
-    fn new(hostname: String, use_pager: bool, client: Box<dyn Client>) -> Cli {
+    fn new(use_pager: bool, client: Box<dyn Client>) -> Cli {
         // Generate commands.
         let mut commands = Commands::new();
         commands.gen_cmds();
 
         // Create CLI session.
-        let mut session = Session::new(hostname, use_pager, client);
-        session.update_prompt();
+        let session = Session::new(use_pager, client);
 
         Cli { commands, session }
     }
@@ -177,14 +174,16 @@ fn main() {
     // Initialize CLI master structure.
     let use_pager = matches.values_of("command").is_none()
         && !matches.is_present("no-pager");
-    let mut cli =
-        Cli::new(DEFAULT_HOSTNAME.to_string(), use_pager, Box::new(client));
+    let mut cli = Cli::new(use_pager, Box::new(client));
 
     // Read configuration file.
     if let Some(path) = matches.value_of("file") {
         read_config_file(cli, path);
         return;
     }
+
+    // Fetch hostname from running configuration and update the prompt.
+    cli.session.update_hostname();
 
     // Process commands passed as arguments, if any.
     if let Some(commands) = matches.values_of("command") {

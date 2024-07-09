@@ -52,9 +52,6 @@
 
   <tree name="config">
     <token name="discard" help="Discard staged changes." cmd="cmd_discard"/>
-    <token name="hostname" help="Set system's network name.">
-      <token name="hostname" argument="hostname" kind="string" help="This system's network name." cmd="cmd_hostname"/>
-    </token>
     <token name="validate" help="Validate configuration." cmd="cmd_validate"/>
   </tree>
 
