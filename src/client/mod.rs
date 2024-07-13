@@ -18,6 +18,11 @@ pub enum DataType {
     State = 2,
 }
 
+pub enum DataValue {
+    String(String),
+    Binary(Vec<u8>),
+}
+
 pub trait Client: Send + std::fmt::Debug {
     // Connect to the Holo daemon.
     fn connect(dest: &'static str) -> Result<Self, StdError>
@@ -34,7 +39,7 @@ pub trait Client: Send + std::fmt::Debug {
         format: DataFormat,
         with_defaults: bool,
         xpath: Option<String>,
-    ) -> Result<String, Error>;
+    ) -> Result<DataValue, Error>;
 
     // Validate the provided candidate configuration.
     fn validate_candidate(&mut self, candidate: &DataTree)
@@ -47,4 +52,15 @@ pub trait Client: Send + std::fmt::Debug {
         candidate: &DataTree,
         comment: Option<String>,
     ) -> Result<(), Error>;
+}
+
+// ===== impl DataValue =====
+
+impl DataValue {
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        match self {
+            DataValue::String(string) => string.as_bytes(),
+            DataValue::Binary(bytes) => bytes.as_ref(),
+        }
+    }
 }

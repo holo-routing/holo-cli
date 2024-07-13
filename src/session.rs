@@ -13,7 +13,7 @@ use yang3::data::{
 };
 use yang3::schema::{SchemaNode, SchemaNodeKind};
 
-use crate::client::{Client, DataType};
+use crate::client::{Client, DataType, DataValue};
 use crate::error::Error;
 use crate::parser::ParsedArgs;
 use crate::token::Commands;
@@ -56,13 +56,14 @@ pub enum ConfigurationType {
 impl Session {
     pub(crate) fn new(use_pager: bool, mut client: Box<dyn Client>) -> Session {
         let yang_ctx = YANG_CTX.get().unwrap();
+        let data_format = DataFormat::LYB;
         let running = client
-            .get(DataType::Config, DataFormat::XML, false, None)
+            .get(DataType::Config, data_format, false, None)
             .unwrap();
         let running = DataTree::parse_string(
             yang_ctx,
-            &running,
-            DataFormat::XML,
+            running.as_bytes(),
+            data_format,
             DataParserFlags::empty(),
             DataValidationFlags::PRESENT | DataValidationFlags::NO_STATE,
         )
@@ -292,7 +293,7 @@ impl Session {
         format: DataFormat,
         with_defaults: bool,
         xpath: Option<String>,
-    ) -> Result<String, Error> {
+    ) -> Result<DataValue, Error> {
         self.client.get(data_type, format, with_defaults, xpath)
     }
 }

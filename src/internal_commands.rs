@@ -17,7 +17,7 @@ use yang3::data::{
 };
 use yang3::schema::SchemaNodeKind;
 
-use crate::client::DataType;
+use crate::client::{DataType, DataValue};
 use crate::parser::ParsedArgs;
 use crate::session::{CommandMode, ConfigurationType, Session};
 use crate::token::{Commands, TokenKind};
@@ -103,13 +103,14 @@ fn fetch_data(
     xpath: &str,
 ) -> Result<DataTree, String> {
     let yang_ctx = YANG_CTX.get().unwrap();
+    let data_format = DataFormat::LYB;
     let data = session
-        .get(data_type, DataFormat::XML, true, Some(xpath.to_owned()))
+        .get(data_type, data_format, true, Some(xpath.to_owned()))
         .map_err(|error| format!("% failed to fetch state data: {}", error))?;
     DataTree::parse_string(
         yang_ctx,
-        &data,
-        DataFormat::XML,
+        data.as_bytes(),
+        data_format,
         DataParserFlags::NO_VALIDATION,
         DataValidationFlags::PRESENT,
     )
@@ -455,11 +456,12 @@ pub(crate) fn cmd_show_state(
     };
 
     match session.get(DataType::State, format, false, xpath) {
-        Ok(data) => {
+        Ok(DataValue::String(data)) => {
             if let Err(error) = page_output(session, &data) {
                 println!("% failed to print state data: {}", error)
             }
         }
+        Ok(DataValue::Binary(_)) => unreachable!(),
         Err(error) => println!("% failed to fetch state data: {}", error),
     }
 

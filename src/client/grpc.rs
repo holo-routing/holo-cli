@@ -10,7 +10,7 @@ use yang3::data::{
     Data, DataDiffFlags, DataFormat, DataPrinterFlags, DataTree,
 };
 
-use crate::client::{Client, DataType};
+use crate::client::{Client, DataType, DataValue};
 use crate::error::Error;
 
 pub mod proto {
@@ -100,8 +100,8 @@ impl Client for GrpcClient {
         format: DataFormat,
         with_defaults: bool,
         xpath: Option<String>,
-    ) -> Result<String, Error> {
-        let data_str = self
+    ) -> Result<DataValue, Error> {
+        let data = self
             .rpc_sync_get(proto::GetRequest {
                 r#type: proto::get_request::DataType::from(data_type) as i32,
                 encoding: proto::Encoding::from(format) as i32,
@@ -112,8 +112,15 @@ impl Client for GrpcClient {
             .into_inner()
             .data
             .unwrap();
-
-        Ok(data_str.data)
+        let data = match data.data.unwrap() {
+            proto::data_tree::Data::DataString(string) => {
+                DataValue::String(string)
+            }
+            proto::data_tree::Data::DataBytes(bytes) => {
+                DataValue::Binary(bytes)
+            }
+        };
+        Ok(data)
     }
 
     fn validate_candidate(
@@ -121,13 +128,16 @@ impl Client for GrpcClient {
         candidate: &DataTree,
     ) -> Result<(), Error> {
         let config = {
-            let encoding = proto::Encoding::Xml as i32;
-            let data = candidate
-                .print_string(DataFormat::XML, DataPrinterFlags::WITH_SIBLINGS)
+            let encoding = proto::Encoding::Lyb as i32;
+            let bytes = candidate
+                .print_bytes(DataFormat::LYB, DataPrinterFlags::WITH_SIBLINGS)
                 .expect("Failed to encode data tree")
                 .unwrap_or_default();
 
-            Some(proto::DataTree { encoding, data })
+            Some(proto::DataTree {
+                encoding,
+                data: Some(proto::data_tree::Data::DataBytes(bytes)),
+            })
         };
 
         self.rpc_sync_validate(proto::ValidateRequest { config })
@@ -144,16 +154,19 @@ impl Client for GrpcClient {
     ) -> Result<(), Error> {
         let operation = proto::commit_request::Operation::Change as i32;
         let config = {
-            let encoding = proto::Encoding::Xml as i32;
+            let encoding = proto::Encoding::Lyb as i32;
             let diff = running
                 .diff(candidate, DataDiffFlags::DEFAULTS)
                 .expect("Failed to compare configurations");
-            let data = diff
-                .print_string(DataFormat::XML, DataPrinterFlags::WITH_SIBLINGS)
+            let bytes = diff
+                .print_bytes(DataFormat::LYB, DataPrinterFlags::WITH_SIBLINGS)
                 .expect("Failed to encode data diff")
                 .unwrap_or_default();
 
-            Some(proto::DataTree { encoding, data })
+            Some(proto::DataTree {
+                encoding,
+                data: Some(proto::data_tree::Data::DataBytes(bytes)),
+            })
         };
 
         self.rpc_sync_commit(proto::CommitRequest {
