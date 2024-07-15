@@ -22,6 +22,148 @@ use crate::parser::ParsedArgs;
 use crate::session::{CommandMode, ConfigurationType, Session};
 use crate::token::{Commands, TokenKind};
 
+const XPATH_PROTOCOL: &str =
+    "/ietf-routing:routing/control-plane-protocols/control-plane-protocol";
+
+struct YangTableBuilder<'a> {
+    session: &'a mut Session,
+    data_type: DataType,
+    paths: Vec<(String, Vec<YangTableColumn>)>,
+}
+
+struct YangTableColumn {
+    title: &'static str,
+    value: YangTableValue,
+}
+
+enum YangTableValue {
+    Leaf(&'static str),
+    Fn(Box<dyn Fn(&DataNodeRef<'_>) -> String>),
+}
+
+// ===== impl YangTableBuilder =====
+
+impl<'a> YangTableBuilder<'a> {
+    // Initializes the builder.
+    pub fn new(session: &'a mut Session, data_type: DataType) -> Self {
+        Self {
+            session,
+            data_type,
+            paths: Vec::new(),
+        }
+    }
+
+    // Adds an XPath to the builder.
+    pub fn xpath(mut self, xpath: &'a str) -> Self {
+        self.paths.push((xpath.to_owned(), Vec::new()));
+        self
+    }
+
+    // Adds a YANG list key filter to the last added XPath in the builder.
+    pub fn filter_list_key<S>(mut self, key: &str, value: Option<S>) -> Self
+    where
+        S: AsRef<str>,
+    {
+        if let Some(value) = value {
+            if let Some((xpath, _)) = self.paths.last_mut() {
+                *xpath = format!("{}[{}='{}']", xpath, key, value.as_ref());
+            }
+        }
+        self
+    }
+
+    // Adds a column to the last added XPath in the builder.
+    pub fn column_leaf(
+        mut self,
+        title: &'static str,
+        name: &'static str,
+    ) -> Self {
+        if let Some((_, columns)) = self.paths.last_mut() {
+            columns.push(YangTableColumn {
+                title,
+                value: YangTableValue::Leaf(name),
+            });
+        }
+        self
+    }
+
+    pub fn column_from_fn(
+        mut self,
+        title: &'static str,
+        cb: Box<dyn Fn(&DataNodeRef<'_>) -> String>,
+    ) -> Self {
+        if let Some((_, columns)) = self.paths.last_mut() {
+            columns.push(YangTableColumn {
+                title,
+                value: YangTableValue::Fn(cb),
+            });
+        }
+        self
+    }
+
+    // Recursively populates the table with data based on the specified paths
+    // and columns.
+    fn show_path(
+        table: &mut Table,
+        dnode: DataNodeRef<'_>,
+        paths: &[(String, Vec<YangTableColumn>)],
+        values: Vec<String>,
+    ) {
+        let Some((xpath, columns)) = paths.first() else {
+            return;
+        };
+
+        for dnode in dnode.find_xpath(xpath).unwrap() {
+            let mut values = values.clone();
+            for column in columns {
+                let value = match &column.value {
+                    YangTableValue::Leaf(name) => dnode.child_value(name),
+                    YangTableValue::Fn(cb) => (*cb)(&dnode),
+                };
+                values.push(value)
+            }
+            if paths.len() == 1 {
+                table.add_row(values.into());
+            } else {
+                Self::show_path(table, dnode, &paths[1..], values);
+            }
+        }
+    }
+
+    // Builds and displays the table.
+    pub fn show(self) -> Result<(), String> {
+        let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+
+        // Fetch data.
+        let data = fetch_data(self.session, self.data_type, xpath_req)?;
+        let Some(dnode) = data.reference() else {
+            return Ok(());
+        };
+
+        // Create the table.
+        let mut table = Table::new();
+        table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
+        let column_titles: Vec<_> = self
+            .paths
+            .iter()
+            .flat_map(|(_, columns)| columns.iter())
+            .map(|column| column.title)
+            .collect();
+        table.set_titles(column_titles.into());
+
+        // Populate the table with data from the specified paths.
+        let values = Vec::new();
+        Self::show_path(&mut table, dnode, &self.paths, values);
+
+        // Print the table to stdout.
+        if let Err(error) = page_table(self.session, &table) {
+            println!("% failed to display data: {}", error);
+        }
+
+        Ok(())
+    }
+}
+
 // ===== helper functions =====
 
 fn get_arg(args: &mut ParsedArgs, name: &str) -> String {
@@ -123,6 +265,8 @@ fn fetch_data(
 pub trait DataNodeRefExt {
     fn child_value(&self, name: &str) -> String;
     fn child_opt_value(&self, name: &str) -> Option<String>;
+    fn relative_value(&self, xpath: &str) -> String;
+    fn relative_opt_value(&self, xpath: &str) -> Option<String>;
 }
 
 impl<'a> DataNodeRefExt for DataNodeRef<'a> {
@@ -133,6 +277,17 @@ impl<'a> DataNodeRefExt for DataNodeRef<'a> {
     fn child_opt_value(&self, name: &str) -> Option<String> {
         self.children()
             .find(|dnode| dnode.schema().name() == name)
+            .map(|dnode| dnode.value_canonical().unwrap())
+    }
+
+    fn relative_value(&self, xpath: &str) -> String {
+        self.relative_opt_value(xpath).unwrap_or("-".to_owned())
+    }
+
+    fn relative_opt_value(&self, xpath: &str) -> Option<String> {
+        self.find_xpath(xpath)
+            .unwrap()
+            .next()
             .map(|dnode| dnode.value_canonical().unwrap())
     }
 }
@@ -508,77 +663,43 @@ pub(crate) fn cmd_show_yang_modules(
 
 // ===== OSPFv2 "show" commands =====
 
+const PROTOCOL_OSPFV2: &str = "ietf-ospf:ospfv2";
+const XPATH_OSPF_AREA: &str = "ietf-ospf:ospf/areas/area";
+const XPATH_OSPF_INTERFACE: &str = "interfaces/interface";
+const XPATH_OSPF_NEIGHBOR: &str = "neighbors/neighbor";
+const XPATH_OSPF_RIB: &str = "ietf-ospf:ospf/local-rib/route";
+const XPATH_OSPF_NEXTHOP: &str = "next-hops/next-hop";
+
 pub(crate) fn cmd_show_ospfv2_interface(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
-    // Parse arguments.
-    let name = get_opt_arg(&mut args, "name");
-
-    // Fetch data.
-    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
-    let xpath_instance = concat!(
-        "/ietf-routing:routing/control-plane-protocols/",
-        "control-plane-protocol[type='ietf-ospf:ospfv2']",
-    );
-    let xpath_area = "ietf-ospf:ospf/areas/area";
-    let mut xpath_iface = "interfaces/interface".to_owned();
-    if let Some(name) = &name {
-        xpath_iface = format!("{}[name='{}']", xpath_iface, name);
-    }
-    let data = fetch_data(session, DataType::All, xpath_req)?;
-
-    // Create the table.
-    let mut table = Table::new();
-    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-    table.set_titles(row![
-        "Instance",
-        "Area",
-        "Name",
-        "Type",
-        "State",
-        "Priority",
-        "Cost",
-        "Hello Interval (s)",
-    ]);
-
-    // Iterate over OSPF instances.
-    for dnode in data.find_xpath(xpath_instance).unwrap() {
-        let instance = dnode.child_value("name");
-
-        // Iterate over OSPF areas.
-        for dnode in dnode.find_xpath(xpath_area).unwrap() {
-            let area = dnode.child_value("area-id");
-
-            // Iterate over OSPF interfaces.
-            for dnode in dnode.find_xpath(&xpath_iface).unwrap() {
-                // Add table row.
-                table.add_row(row![
-                    instance,
-                    area,
-                    dnode.child_value("name"),
-                    dnode.child_value("interface-type"),
-                    dnode.child_value("state"),
-                    dnode.child_value("priority"),
-                    dnode.child_value("cost"),
-                    format!(
-                        "{} ({})",
-                        dnode.child_value("hello-interval"),
-                        dnode
-                            .child_opt_value("hello-timer")
-                            .map(|timer| format!("due in {}", timer))
-                            .unwrap_or("inactive".to_owned())
-                    )
-                ]);
-            }
-        }
-    }
-
-    // Print the table to stdout.
-    if let Err(error) = page_table(session, &table) {
-        println!("% failed to display data: {}", error)
-    }
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(PROTOCOL_OSPFV2))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_OSPF_AREA)
+        .column_leaf("Area", "area-id")
+        .xpath(XPATH_OSPF_INTERFACE)
+        .filter_list_key("name", get_opt_arg(&mut args, "name"))
+        .column_leaf("Name", "name")
+        .column_leaf("Type", "interface-type")
+        .column_leaf("State", "state")
+        .column_leaf("Priority", "priority")
+        .column_leaf("Cost", "cost")
+        .column_from_fn(
+            "Hello Interval (s)",
+            Box::new(|dnode| {
+                let interval = dnode.child_value("hello-interval");
+                let remaining = dnode
+                    .child_opt_value("hello-timer")
+                    .map(|timer| format!("due in {}", timer))
+                    .unwrap_or("inactive".to_owned());
+                format!("{} ({})", interval, remaining)
+            }),
+        )
+        .show()?;
 
     Ok(false)
 }
@@ -656,75 +777,31 @@ pub(crate) fn cmd_show_ospfv2_neighbor(
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
-    // Parse arguments.
-    let router_id = get_opt_arg(&mut args, "router_id");
-
-    // Fetch data.
-    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
-    let xpath_instance = concat!(
-        "/ietf-routing:routing/control-plane-protocols/",
-        "control-plane-protocol[type='ietf-ospf:ospfv2']",
-    );
-    let xpath_area = "ietf-ospf:ospf/areas/area";
-    let xpath_iface = "interfaces/interface";
-    let mut xpath_nbr = "neighbors/neighbor".to_owned();
-    if let Some(router_id) = &router_id {
-        xpath_nbr =
-            format!("{}[neighbor-router-id='{}']", xpath_nbr, router_id);
-    }
-    let data = fetch_data(session, DataType::All, xpath_req)?;
-
-    // Create the table.
-    let mut table = Table::new();
-    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-    table.set_titles(row![
-        "Instance",
-        "Area",
-        "Interface",
-        "Router ID",
-        "Address",
-        "State",
-        "Dead Interval (s)",
-    ]);
-
-    // Iterate over OSPF instances.
-    for dnode in data.find_xpath(xpath_instance).unwrap() {
-        let instance = dnode.child_value("name");
-
-        // Iterate over OSPF areas.
-        for dnode in dnode.find_xpath(xpath_area).unwrap() {
-            let area = dnode.child_value("area-id");
-
-            // Iterate over OSPF interfaces.
-            for dnode in dnode.find_xpath(xpath_iface).unwrap() {
-                let ifname = dnode.child_value("name");
-                let dead_interval = dnode.child_value("dead-interval");
-
-                // Iterate over OSPF neighbors.
-                for dnode in dnode.find_xpath(&xpath_nbr).unwrap() {
-                    // Add table row.
-                    table.add_row(row![
-                        instance,
-                        area,
-                        ifname,
-                        dnode.child_value("neighbor-router-id"),
-                        dnode.child_value("address"),
-                        dnode.child_value("state"),
-                        format!(
-                            "{} (due in {})",
-                            dead_interval,
-                            dnode.child_value("dead-timer")
-                        )
-                    ]);
-                }
-            }
-        }
-    }
-
-    // Print the table to stdout.
-    if let Err(error) = page_table(session, &table) {
-        println!("% failed to display data: {}", error)
-    }
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(PROTOCOL_OSPFV2))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_OSPF_AREA)
+        .column_leaf("Area", "area-id")
+        .xpath(XPATH_OSPF_INTERFACE)
+        .column_leaf("Interface", "name")
+        .xpath(XPATH_OSPF_NEIGHBOR)
+        .filter_list_key(
+            "neighbor-router-id=",
+            get_opt_arg(&mut args, "router_id"),
+        )
+        .column_leaf("Router ID", "neighbor-router-id")
+        .column_leaf("Address", "address")
+        .column_leaf("State", "state")
+        .column_from_fn(
+            "Dead Interval (s)",
+            Box::new(|dnode| {
+                let interval = dnode.relative_value("../../dead-interval");
+                let remaining = dnode.child_value("dead-timer");
+                format!("{} ({})", interval, remaining)
+            }),
+        )
+        .show()?;
 
     Ok(false)
 }
@@ -822,68 +899,20 @@ pub(crate) fn cmd_show_ospfv2_route(
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
-    // Parse arguments.
-    let prefix = get_opt_arg(&mut args, "prefix");
-
-    // Fetch data.
-    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
-    let xpath_instance = concat!(
-        "/ietf-routing:routing/control-plane-protocols/",
-        "control-plane-protocol[type='ietf-ospf:ospfv2']",
-    );
-    let mut xpath_rib = "ietf-ospf:ospf/local-rib/route".to_owned();
-    if let Some(prefix) = &prefix {
-        xpath_rib = format!("{}[prefix='{}']", xpath_rib, prefix);
-    }
-    let data = fetch_data(session, DataType::All, xpath_req)?;
-
-    // Create the table.
-    let mut table = Table::new();
-    table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
-    table.set_titles(row![
-        "Instance",
-        "Prefix",
-        "Metric",
-        "Type",
-        "Tag",
-        "Nexthop Interface",
-        "Nexthop Address",
-    ]);
-
-    // Iterate over OSPF instances.
-    for dnode in data.find_xpath(xpath_instance).unwrap() {
-        let instance = dnode.child_value("name");
-
-        // Iterate over OSPF routes.
-        for dnode in dnode.find_xpath(&xpath_rib).unwrap() {
-            let prefix = dnode.child_value("prefix");
-            let metric = dnode.child_value("metric");
-            let route_type = dnode.child_value("route-type");
-            let tag = dnode.child_value("route-tag");
-            let mut first = true;
-
-            // Iterate over route nexthop.
-            for dnode in dnode.find_xpath("next-hops/next-hop").unwrap() {
-                // Add table row.
-                table.add_row(row![
-                    instance,
-                    if first { &prefix } else { "" },
-                    if first { &metric } else { "" },
-                    if first { &route_type } else { "" },
-                    if first { &tag } else { "" },
-                    dnode.child_value("outgoing-interface"),
-                    dnode.child_value("next-hop"),
-                ]);
-
-                first = false;
-            }
-        }
-    }
-
-    // Print the table to stdout.
-    if let Err(error) = page_table(session, &table) {
-        println!("% failed to display data: {}", error)
-    }
+    YangTableBuilder::new(session, DataType::State)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(PROTOCOL_OSPFV2))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_OSPF_RIB)
+        .filter_list_key("prefix", get_opt_arg(&mut args, "prefix"))
+        .column_leaf("Prefix", "prefix")
+        .column_leaf("Metric", "metric")
+        .column_leaf("Type", "route-type")
+        .column_leaf("Tag", "route-tag")
+        .xpath(XPATH_OSPF_NEXTHOP)
+        .column_leaf("Nexthop Interface", "outgoing-interface")
+        .column_leaf("Nexthop Address", "next-hop")
+        .show()?;
 
     Ok(false)
 }
