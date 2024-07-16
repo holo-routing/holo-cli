@@ -30,21 +30,38 @@
         <token name="modules" help="Show loaded YANG modules." cmd="cmd_show_yang_modules"/>
       </token>
       <!-- OSPF show commands -->
-      <token name="ospfv2" help="OSPFv2 information">
-        <token name="interface" help="Interface information" cmd="cmd_show_ospfv2_interface">
-          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospfv2_interface_detail"/>
-          <token name="NAME" help="Interface name" argument="name" kind="string" cmd="cmd_show_ospfv2_interface">
-            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospfv2_interface_detail"/>
+      <token name="ospfv2" argument="protocol" help="OSPFv2 information">
+        <token name="interface" help="Interface information" cmd="cmd_show_ospf_interface">
+          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_interface_detail"/>
+          <token name="NAME" help="Interface name" argument="name" kind="string" cmd="cmd_show_ospf_interface">
+            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_interface_detail"/>
           </token>
         </token>
-        <token name="neighbor" help="Neighbor information" cmd="cmd_show_ospfv2_neighbor">
-          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospfv2_neighbor_detail"/>
-          <token name="router_id" help="Neighbor Router ID" argument="router_id" kind="string" cmd="cmd_show_ospfv2_neighbor">
-            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospfv2_neighbor_detail"/>
+        <token name="neighbor" help="Neighbor information" cmd="cmd_show_ospf_neighbor">
+          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_neighbor_detail"/>
+          <token name="router_id" help="Neighbor Router ID" argument="router_id" kind="string" cmd="cmd_show_ospf_neighbor">
+            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_neighbor_detail"/>
           </token>
         </token>
-        <token name="route" help="Route information" cmd="cmd_show_ospfv2_route">
-          <token name="prefix" help="IPv4 prefix" argument="prefix" kind="string" cmd="cmd_show_ospfv2_route"/>
+        <token name="route" help="Route information" cmd="cmd_show_ospf_route">
+          <token name="prefix" help="IPv4 prefix" argument="prefix" kind="string" cmd="cmd_show_ospf_route"/>
+        </token>
+      </token>
+      <token name="ospfv3" argument="protocol" help="OSPFv3 information">
+        <token name="interface" help="Interface information" cmd="cmd_show_ospf_interface">
+          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_interface_detail"/>
+          <token name="NAME" help="Interface name" argument="name" kind="string" cmd="cmd_show_ospf_interface">
+            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_interface_detail"/>
+          </token>
+        </token>
+        <token name="neighbor" help="Neighbor information" cmd="cmd_show_ospf_neighbor">
+          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_neighbor_detail"/>
+          <token name="router_id" help="Neighbor Router ID" argument="router_id" kind="string" cmd="cmd_show_ospf_neighbor">
+            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_neighbor_detail"/>
+          </token>
+        </token>
+        <token name="route" help="Route information" cmd="cmd_show_ospf_route">
+          <token name="prefix" help="IPv4 prefix" argument="prefix" kind="string" cmd="cmd_show_ospf_route"/>
         </token>
       </token>
     </token>

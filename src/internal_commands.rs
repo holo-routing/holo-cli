@@ -661,23 +661,29 @@ pub(crate) fn cmd_show_yang_modules(
     Ok(false)
 }
 
-// ===== OSPFv2 "show" commands =====
+// ===== OSPF "show" commands =====
 
 const PROTOCOL_OSPFV2: &str = "ietf-ospf:ospfv2";
+const PROTOCOL_OSPFV3: &str = "ietf-ospf:ospfv3";
 const XPATH_OSPF_AREA: &str = "ietf-ospf:ospf/areas/area";
 const XPATH_OSPF_INTERFACE: &str = "interfaces/interface";
 const XPATH_OSPF_NEIGHBOR: &str = "neighbors/neighbor";
 const XPATH_OSPF_RIB: &str = "ietf-ospf:ospf/local-rib/route";
 const XPATH_OSPF_NEXTHOP: &str = "next-hops/next-hop";
 
-pub(crate) fn cmd_show_ospfv2_interface(
+pub(crate) fn cmd_show_ospf_interface(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ospfv2" => PROTOCOL_OSPFV2,
+        "ospfv3" => PROTOCOL_OSPFV3,
+        _ => unreachable!(),
+    };
     YangTableBuilder::new(session, DataType::All)
         .xpath(XPATH_PROTOCOL)
-        .filter_list_key("type", Some(PROTOCOL_OSPFV2))
+        .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
         .xpath(XPATH_OSPF_AREA)
         .column_leaf("Area", "area-id")
@@ -704,7 +710,7 @@ pub(crate) fn cmd_show_ospfv2_interface(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospfv2_interface_detail(
+pub(crate) fn cmd_show_ospf_interface_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -712,13 +718,17 @@ pub(crate) fn cmd_show_ospfv2_interface_detail(
     let mut output = String::new();
 
     // Parse arguments.
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ospfv2" => PROTOCOL_OSPFV2,
+        "ospfv3" => PROTOCOL_OSPFV3,
+        _ => unreachable!(),
+    };
     let name = get_opt_arg(&mut args, "name");
 
     // Fetch data.
     let xpath_req = "/ietf-routing:routing/control-plane-protocols";
-    let xpath_instance = concat!(
-        "/ietf-routing:routing/control-plane-protocols/",
-        "control-plane-protocol[type='ietf-ospf:ospfv2']",
+    let xpath_instance = format!(
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
     );
     let xpath_area = "ietf-ospf:ospf/areas/area";
     let mut xpath_iface = "interfaces/interface".to_owned();
@@ -728,7 +738,7 @@ pub(crate) fn cmd_show_ospfv2_interface_detail(
     let data = fetch_data(session, DataType::All, xpath_req)?;
 
     // Iterate over OSPF instances.
-    for dnode in data.find_xpath(xpath_instance).unwrap() {
+    for dnode in data.find_xpath(&xpath_instance).unwrap() {
         let instance = dnode.child_value("name");
 
         // Iterate over OSPF areas.
@@ -772,14 +782,19 @@ pub(crate) fn cmd_show_ospfv2_interface_detail(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospfv2_neighbor(
+pub(crate) fn cmd_show_ospf_neighbor(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ospfv2" => PROTOCOL_OSPFV2,
+        "ospfv3" => PROTOCOL_OSPFV3,
+        _ => unreachable!(),
+    };
     YangTableBuilder::new(session, DataType::All)
         .xpath(XPATH_PROTOCOL)
-        .filter_list_key("type", Some(PROTOCOL_OSPFV2))
+        .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
         .xpath(XPATH_OSPF_AREA)
         .column_leaf("Area", "area-id")
@@ -806,7 +821,7 @@ pub(crate) fn cmd_show_ospfv2_neighbor(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospfv2_neighbor_detail(
+pub(crate) fn cmd_show_ospf_neighbor_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -814,13 +829,17 @@ pub(crate) fn cmd_show_ospfv2_neighbor_detail(
     let mut output = String::new();
 
     // Parse arguments.
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ospfv2" => PROTOCOL_OSPFV2,
+        "ospfv3" => PROTOCOL_OSPFV3,
+        _ => unreachable!(),
+    };
     let router_id = get_opt_arg(&mut args, "router_id");
 
     // Fetch data.
     let xpath_req = "/ietf-routing:routing/control-plane-protocols";
-    let xpath_instance = concat!(
-        "/ietf-routing:routing/control-plane-protocols/",
-        "control-plane-protocol[type='ietf-ospf:ospfv2']",
+    let xpath_instance = format!(
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
     );
     let xpath_area = "ietf-ospf:ospf/areas/area";
     let xpath_iface = "interfaces/interface";
@@ -832,7 +851,7 @@ pub(crate) fn cmd_show_ospfv2_neighbor_detail(
     let data = fetch_data(session, DataType::All, xpath_req)?;
 
     // Iterate over OSPF instances.
-    for dnode in data.find_xpath(xpath_instance).unwrap() {
+    for dnode in data.find_xpath(&xpath_instance).unwrap() {
         let instance = dnode.child_value("name");
 
         // Iterate over OSPF areas.
@@ -894,14 +913,19 @@ pub(crate) fn cmd_show_ospfv2_neighbor_detail(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospfv2_route(
+pub(crate) fn cmd_show_ospf_route(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ospfv2" => PROTOCOL_OSPFV2,
+        "ospfv3" => PROTOCOL_OSPFV3,
+        _ => unreachable!(),
+    };
     YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
-        .filter_list_key("type", Some(PROTOCOL_OSPFV2))
+        .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
         .xpath(XPATH_OSPF_RIB)
         .filter_list_key("prefix", get_opt_arg(&mut args, "prefix"))

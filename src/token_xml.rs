@@ -83,19 +83,15 @@ fn parse_tag_token(
         "cmd_show_config_changes" => internal_commands::cmd_show_config_changes,
         "cmd_show_state" => internal_commands::cmd_show_state,
         "cmd_show_yang_modules" => internal_commands::cmd_show_yang_modules,
-        "cmd_show_ospfv2_interface" => {
-            internal_commands::cmd_show_ospfv2_interface
+        "cmd_show_ospf_interface" => internal_commands::cmd_show_ospf_interface,
+        "cmd_show_ospf_interface_detail" => {
+            internal_commands::cmd_show_ospf_interface_detail
         }
-        "cmd_show_ospfv2_interface_detail" => {
-            internal_commands::cmd_show_ospfv2_interface_detail
+        "cmd_show_ospf_neighbor" => internal_commands::cmd_show_ospf_neighbor,
+        "cmd_show_ospf_neighbor_detail" => {
+            internal_commands::cmd_show_ospf_neighbor_detail
         }
-        "cmd_show_ospfv2_neighbor" => {
-            internal_commands::cmd_show_ospfv2_neighbor
-        }
-        "cmd_show_ospfv2_neighbor_detail" => {
-            internal_commands::cmd_show_ospfv2_neighbor_detail
-        }
-        "cmd_show_ospfv2_route" => internal_commands::cmd_show_ospfv2_route,
+        "cmd_show_ospf_route" => internal_commands::cmd_show_ospf_route,
         _ => panic!("unknown command name: {}", name),
     });
 
