@@ -1165,3 +1165,399 @@ pub(crate) fn cmd_show_rip_route(
 
     Ok(false)
 }
+
+// ===== LDP "show" commands =====
+
+const PROTOCOL_MPLS_LDP: &str = "ietf-mpls-ldp:mpls-ldp";
+const XPATH_MPLS_LDP_INTERFACE: &str =
+    "ietf-mpls-ldp:mpls-ldp/discovery/interfaces/interface";
+
+const XPATH_MPLS_LDP_ADJACENCY: &str =
+    "address-families/ipv4/hello-adjacencies/hello-adjacency";
+const XPATH_MPLS_LDP_ADJACENCY_PEER: &str = "peer";
+const XPATH_MPLS_LDP_PEER: &str = "ietf-mpls-ldp:mpls-ldp/peers/peer";
+const XPATH_MPLS_LDP_BINDING_ADDRESS: &str =
+    "ietf-mpls-ldp:mpls-ldp/global/address-families/ipv4/bindings/address";
+const XPATH_MPLS_LDP_BINDING_FEC: &str =
+    "ietf-mpls-ldp:mpls-ldp/global/address-families/ipv4/bindings/fec-label";
+const XPATH_MPLS_LDP_BINDING_FEC_PEER: &str = "peer";
+
+pub(crate) fn cmd_show_mpls_ldp_interface(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "mpls-ldp" => PROTOCOL_MPLS_LDP,
+        _ => unreachable!(),
+    };
+
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_MPLS_LDP_INTERFACE)
+        .filter_list_key("name", get_opt_arg(&mut args, "name"))
+        .column_leaf("Name", "name")
+        .xpath(XPATH_MPLS_LDP_ADJACENCY)
+        .column_leaf("Adjacent address", "adjacent-address")
+        .xpath(XPATH_MPLS_LDP_ADJACENCY_PEER)
+        .column_leaf("Neighbor lsr-id", "lsr-id")
+        .show()?;
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_mpls_ldp_interface_detail(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let mut output = String::new();
+
+    // Parse arguments.
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "mpls-ldp" => PROTOCOL_MPLS_LDP,
+        _ => unreachable!(),
+    };
+    let name = get_opt_arg(&mut args, "name");
+
+    // Fetch data.
+    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+    let xpath_instance = format!(
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
+    );
+
+    let mut xpath_iface =
+        "ietf-mpls-ldp:mpls-ldp/discovery/interfaces/interface".to_owned();
+
+    // when find_xpath is invoked current node is address-families
+    let xpath_adjacency = "ipv4/hello-adjacencies/hello-adjacency".to_owned();
+
+    if let Some(name) = &name {
+        xpath_iface = format!("{}[name='{}']", xpath_iface, name);
+    }
+
+    let data = fetch_data(session, DataType::All, xpath_req)?;
+
+    // Iterate over MPLS LDP instances.
+    for dnode in data.find_xpath(&xpath_instance).unwrap() {
+        let instance = dnode.child_value("name");
+
+        // Iterate over MPLS LDP interfaces.
+        for dnode in dnode.find_xpath(&xpath_iface).unwrap() {
+            writeln!(output, "{}", dnode.child_value("name")).unwrap();
+            writeln!(output, " instance: {}", instance).unwrap();
+            for dnode in dnode
+                .children()
+                .filter(|dnode| !dnode.schema().is_list_key())
+            {
+                let snode = dnode.schema();
+                let snode_name = snode.name();
+                if let Some(value) = dnode.value_canonical() {
+                    writeln!(output, " {}: {}", snode_name, value).unwrap();
+                } else if snode_name == "address-families" {
+                    writeln!(output, "  {}:", snode_name).unwrap();
+                    writeln!(output, "   address-family:").unwrap();
+                    writeln!(output, "    ipv4:").unwrap();
+                    writeln!(output, "     hello-adjacencies:").unwrap();
+                    writeln!(output, "      hello-adjacency:").unwrap();
+                    for dnode in dnode.find_xpath(&xpath_adjacency).unwrap() {
+                        for dnode in dnode.children() {
+                            let snode = dnode.schema();
+                            let snode_name = snode.name();
+                            if let Some(value) = dnode.value_canonical() {
+                                writeln!(
+                                    output,
+                                    "       {}: {}",
+                                    snode_name, value
+                                )
+                                .unwrap();
+                            } else {
+                                writeln!(output, "       {}:", snode_name)
+                                    .unwrap();
+                                for dnode in dnode.children() {
+                                    let snode = dnode.schema();
+                                    let snode_name = snode.name();
+                                    if let Some(value) = dnode.value_canonical()
+                                    {
+                                        writeln!(
+                                            output,
+                                            "        {}: {}",
+                                            snode_name, value
+                                        )
+                                        .unwrap();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            writeln!(output).unwrap();
+        }
+    }
+
+    if let Err(error) = page_output(session, &output) {
+        println!("% failed to print data: {}", error)
+    }
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_mpls_ldp_peer(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "mpls-ldp" => PROTOCOL_MPLS_LDP,
+        _ => unreachable!(),
+    };
+
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_MPLS_LDP_PEER)
+        .filter_list_key("lsr-id", get_opt_arg(&mut args, "peer"))
+        .column_leaf("Peer", "lsr-id")
+        .column_leaf("State", "session-state")
+        .column_leaf("Uptime", "up-time")
+        .xpath(XPATH_MPLS_LDP_ADJACENCY)
+        .column_leaf("Local address", "local-address")
+        .column_leaf("Adjacent address", "adjacent-address")
+        .show()?;
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_mpls_ldp_peer_detail(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let mut output = String::new();
+
+    // Parse arguments.
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "mpls-ldp" => PROTOCOL_MPLS_LDP,
+        _ => unreachable!(),
+    };
+    let name = get_opt_arg(&mut args, "name");
+
+    // Fetch data.
+    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+    let xpath_instance = format!(
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
+    );
+
+    let mut xpath_peer = "ietf-mpls-ldp:mpls-ldp/peers/peer".to_owned();
+
+    let xpath_adjacency = "ipv4/hello-adjacencies/hello-adjacency".to_owned();
+
+    let xpath_capability = "capability".to_owned();
+
+    if let Some(name) = &name {
+        xpath_peer = format!("{}[name='{}']", xpath_peer, name);
+    }
+
+    let data = fetch_data(session, DataType::All, xpath_req)?;
+
+    // Iterate over MPLS LDP instances.
+    for dnode in data.find_xpath(&xpath_instance).unwrap() {
+        let instance = dnode.child_value("name");
+
+        // Iterate over MPLS LDP peers.
+        for dnode in dnode.find_xpath(&xpath_peer).unwrap() {
+            writeln!(output, "{}", dnode.child_value("lsr-id")).unwrap();
+            writeln!(output, " instance: {}", instance).unwrap();
+            for dnode in dnode
+                .children()
+                .filter(|dnode| !dnode.schema().is_list_key())
+            {
+                let snode = dnode.schema();
+                let snode_name = snode.name();
+                if let Some(value) = dnode.value_canonical() {
+                    writeln!(output, " {}: {}", snode_name, value).unwrap();
+                } else if snode_name == "address-families" {
+                    writeln!(output, "  {}:", snode_name).unwrap();
+                    writeln!(output, "   address-family:").unwrap();
+                    writeln!(output, "    ipv4:").unwrap();
+                    writeln!(output, "     hello-adjacencies:").unwrap();
+                    writeln!(output, "      hello-adjacency:").unwrap();
+                    for dnode in dnode.find_xpath(&xpath_adjacency).unwrap() {
+                        for dnode in dnode.children() {
+                            let snode = dnode.schema();
+                            let snode_name = snode.name();
+                            if let Some(value) = dnode.value_canonical() {
+                                writeln!(
+                                    output,
+                                    "       {}: {}",
+                                    snode_name, value
+                                )
+                                .unwrap();
+                            } else {
+                                writeln!(output, "       {}:", snode_name)
+                                    .unwrap();
+                                for dnode in dnode.children() {
+                                    let snode = dnode.schema();
+                                    let snode_name = snode.name();
+                                    if let Some(value) = dnode.value_canonical()
+                                    {
+                                        writeln!(
+                                            output,
+                                            "        {}: {}",
+                                            snode_name, value
+                                        )
+                                        .unwrap();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if snode_name == "received-peer-state" {
+                    writeln!(output, "  {}:", snode_name).unwrap();
+                    writeln!(output, "   capability:").unwrap();
+                    for dnode in dnode.find_xpath(&xpath_capability).unwrap() {
+                        for dnode in dnode.children() {
+                            let snode = dnode.schema();
+                            let snode_name = snode.name();
+                            if let Some(value) = dnode.value_canonical() {
+                                writeln!(
+                                    output,
+                                    "    {}: {}",
+                                    snode_name, value
+                                )
+                                .unwrap();
+                            } else {
+                                writeln!(output, "    {}:", snode_name)
+                                    .unwrap();
+                                for dnode in dnode.children() {
+                                    let snode = dnode.schema();
+                                    let snode_name = snode.name();
+                                    if let Some(value) = dnode.value_canonical()
+                                    {
+                                        writeln!(
+                                            output,
+                                            "     {}: {}",
+                                            snode_name, value
+                                        )
+                                        .unwrap();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if snode_name == "label-advertisement-mode"
+                    || snode_name == "session-holdtime"
+                    || snode_name == "tcp-connection"
+                    || snode_name == "statistics"
+                {
+                    writeln!(output, "  {}:", snode_name).unwrap();
+                    for dnode in dnode.children() {
+                        let snode = dnode.schema();
+                        let snode_name = snode.name();
+                        if let Some(value) = dnode.value_canonical() {
+                            writeln!(output, "   {}: {}", snode_name, value)
+                                .unwrap();
+                        } else {
+                            writeln!(output, "   {}:", snode_name).unwrap();
+                            for dnode in dnode.children() {
+                                let snode = dnode.schema();
+                                let snode_name = snode.name();
+                                if let Some(value) = dnode.value_canonical() {
+                                    writeln!(
+                                        output,
+                                        "    {}: {}",
+                                        snode_name, value
+                                    )
+                                    .unwrap();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            writeln!(output).unwrap();
+        }
+    }
+
+    if let Err(error) = page_output(session, &output) {
+        println!("% failed to print data: {}", error)
+    }
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_mpls_ldp_binding_address(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "mpls-ldp" => PROTOCOL_MPLS_LDP,
+        _ => unreachable!(),
+    };
+
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_MPLS_LDP_BINDING_ADDRESS)
+        .filter_list_key("address", get_opt_arg(&mut args, "address"))
+        .column_leaf("Address", "address")
+        .column_leaf("Advertisement type", "advertisement-type")
+        .show()?;
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_mpls_ldp_binding_fec(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "mpls-ldp" => PROTOCOL_MPLS_LDP,
+        _ => unreachable!(),
+    };
+
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_MPLS_LDP_BINDING_FEC)
+        .filter_list_key("fec", get_opt_arg(&mut args, "fec"))
+        .column_leaf("Prefix", "fec")
+        .xpath(XPATH_MPLS_LDP_BINDING_FEC_PEER)
+        .filter_list_key("lsr-id", get_opt_arg(&mut args, "lsr-id"))
+        .column_from_fn(
+            "Nexthop",
+            Box::new(|dnode| {
+                let lsr_id = dnode.child_value("lsr-id");
+                let label_space_id = dnode.child_value("label-space-id");
+                format!("{}:{}", lsr_id, label_space_id)
+            }),
+        )
+        .column_leaf("Advertisement type", "advertisement-type")
+        .column_from_fn(
+            "Label",
+            Box::new(|dnode| {
+                let lsr_id = dnode.child_value("label");
+                match lsr_id.as_str() {
+                    "ietf-routing-types:implicit-null-label" => {
+                        "imp-null".to_owned()
+                    }
+                    "ietf-routing-types:explicit-null-label" => {
+                        "exp-null".to_owned()
+                    }
+                    _ => lsr_id,
+                }
+            }),
+        )
+        .column_leaf("In use", "used-in-forwarding")
+        .show()?;
+
+    Ok(false)
+}
