@@ -1108,7 +1108,7 @@ pub(crate) fn cmd_show_rip_neighbor_detail(
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
         let instance = dnode.child_value("name");
 
-        // Iterate over RIP interfaces.
+        // Iterate over RIP neighbors.
         for dnode in dnode.find_xpath(&xpath_neighbor).unwrap() {
             // "address" keyword is used to identify the afi address type
             writeln!(output, "{}", dnode.child_value(address)).unwrap();
