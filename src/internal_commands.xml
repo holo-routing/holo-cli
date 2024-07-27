@@ -64,6 +64,41 @@
           <token name="prefix" help="IPv4 prefix" argument="prefix" kind="string" cmd="cmd_show_ospf_route"/>
         </token>
       </token>
+      <!-- RIP show commands -->
+      <token name="ripv2" argument="protocol" help="RIPv2 information">
+        <token name="interface" help="Interface information" cmd="cmd_show_rip_interface">
+          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_rip_interface_detail"/>
+          <token name="NAME" help="Interface name" argument="name" kind="string" cmd="cmd_show_rip_interface">
+            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_rip_interface_detail"/>
+          </token>
+        </token>
+        <token name="neighbor" help="Neighbor information" cmd="cmd_show_rip_neighbor">
+          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_rip_neighbor_detail"/>
+          <token name="address" help="Neighbor IPv4 address" argument="address" kind="string" cmd="cmd_show_rip_neighbor">
+            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_rip_neighbor_detail"/>
+          </token>
+        </token>
+        <token name="route" help="Route information" cmd="cmd_show_rip_route">
+          <token name="prefix" help="IPv4 prefix" argument="prefix" kind="string" cmd="cmd_show_rip_route"/>
+        </token>
+      </token>
+      <token name="ripng" argument="protocol" help="RIPng information">
+        <token name="interface" help="Interface information" cmd="cmd_show_rip_interface">
+          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_rip_interface_detail"/>
+          <token name="NAME" help="Interface name" argument="name" kind="string" cmd="cmd_show_rip_interface">
+            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_rip_interface_detail"/>
+          </token>
+        </token>
+        <token name="neighbor" help="Neighbor information" cmd="cmd_show_rip_neighbor">
+          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_rip_neighbor_detail"/>
+          <token name="address" help="Neighbor IPv6 address" argument="address" kind="string" cmd="cmd_show_rip_neighbor">
+            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_rip_neighbor_detail"/>
+          </token>
+        </token>
+        <token name="route" help="Route information" cmd="cmd_show_rip_route">
+          <token name="prefix" help="IPv6 prefix" argument="prefix" kind="string" cmd="cmd_show_rip_route"/>
+        </token>
+      </token>
     </token>
   </tree>
 

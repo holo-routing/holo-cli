@@ -92,6 +92,15 @@ fn parse_tag_token(
             internal_commands::cmd_show_ospf_neighbor_detail
         }
         "cmd_show_ospf_route" => internal_commands::cmd_show_ospf_route,
+        "cmd_show_rip_interface" => internal_commands::cmd_show_rip_interface,
+        "cmd_show_rip_interface_detail" => {
+            internal_commands::cmd_show_rip_interface_detail
+        }
+        "cmd_show_rip_neighbor" => internal_commands::cmd_show_rip_neighbor,
+        "cmd_show_rip_neighbor_detail" => {
+            internal_commands::cmd_show_rip_neighbor_detail
+        }
+        "cmd_show_rip_route" => internal_commands::cmd_show_rip_route,
         _ => panic!("unknown command name: {}", name),
     });
 

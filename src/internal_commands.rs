@@ -940,3 +940,228 @@ pub(crate) fn cmd_show_ospf_route(
 
     Ok(false)
 }
+
+// ===== RIP "show" commands =====
+
+const PROTOCOL_RIPV2: &str = "ietf-rip:ripv2";
+const PROTOCOL_RIPNG: &str = "ietf-rip:ripng";
+const XPATH_RIP_INTERFACE: &str = "ietf-rip:rip/interfaces/interface";
+const AFI4: &str = "ipv4";
+const AFI6: &str = "ipv6";
+
+pub(crate) fn cmd_show_rip_interface(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    // Parse arguments.
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ripv2" => PROTOCOL_RIPV2,
+        "ripng" => PROTOCOL_RIPNG,
+        _ => unreachable!(),
+    };
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_RIP_INTERFACE)
+        .filter_list_key("interface", get_opt_arg(&mut args, "name"))
+        .column_leaf("Name", "interface")
+        .column_leaf("State", "oper-status")
+        .show()?;
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_rip_interface_detail(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let mut output = String::new();
+
+    // Parse arguments.
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ripv2" => PROTOCOL_RIPV2,
+        "ripng" => PROTOCOL_RIPNG,
+        _ => unreachable!(),
+    };
+
+    let name = get_opt_arg(&mut args, "name");
+
+    // Fetch data.
+    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+    let xpath_instance = format!(
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
+    );
+
+    let mut xpath_iface = "ietf-rip:rip/interfaces/interface".to_owned();
+
+    if let Some(name) = &name {
+        // xpath_iface = format!("{}[name='{}']", xpath_iface, name);
+        xpath_iface = format!("{}[interface='{}']", xpath_iface, name);
+    }
+
+    let data = fetch_data(session, DataType::All, xpath_req)?;
+
+    // Iterate over RIP instances.
+    for dnode in data.find_xpath(&xpath_instance).unwrap() {
+        let instance = dnode.child_value("name");
+
+        // Iterate over RIP interfaces.
+        for dnode in dnode.find_xpath(&xpath_iface).unwrap() {
+            // "interface" keyword is used to identify interface name
+            writeln!(output, "{}", dnode.child_value("interface")).unwrap();
+            writeln!(output, " instance: {}", instance).unwrap();
+            for dnode in dnode
+                .children()
+                .filter(|dnode| !dnode.schema().is_list_key())
+            {
+                let snode = dnode.schema();
+                let snode_name = snode.name();
+                if let Some(value) = dnode.value_canonical() {
+                    writeln!(output, " {}: {}", snode_name, value).unwrap();
+                } else if snode_name == "statistics" {
+                    writeln!(output, " statistics").unwrap();
+                    for dnode in dnode.children() {
+                        let snode = dnode.schema();
+                        let snode_name = snode.name();
+                        if let Some(value) = dnode.value_canonical() {
+                            writeln!(output, "  {}: {}", snode_name, value)
+                                .unwrap();
+                        }
+                    }
+                }
+            }
+            writeln!(output).unwrap();
+        }
+    }
+
+    if let Err(error) = page_output(session, &output) {
+        println!("% failed to print data: {}", error)
+    }
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_rip_neighbor(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    // Parse arguments.
+    let (protocol, afi, address) = match get_arg(&mut args, "protocol").as_str()
+    {
+        "ripv2" => (PROTOCOL_RIPV2, AFI4, "ipv4-address"),
+        "ripng" => (PROTOCOL_RIPNG, AFI6, "ipv6-address"),
+        _ => unreachable!(),
+    };
+
+    let xpath_rip_neighbor = format!("ietf-rip:rip/{}/neighbors/neighbor", afi);
+
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(xpath_rip_neighbor.as_str())
+        .filter_list_key(address, get_opt_arg(&mut args, "address"))
+        .column_leaf("Address", address)
+        .column_leaf("Last update", "last-update")
+        .show()?;
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_rip_neighbor_detail(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let mut output = String::new();
+
+    // Parse arguments.
+    let (protocol, afi, address) = match get_arg(&mut args, "protocol").as_str()
+    {
+        "ripv2" => (PROTOCOL_RIPV2, "ipv4", "ipv4-address"),
+        "ripng" => (PROTOCOL_RIPNG, "ipv6", "ipv6-address"),
+        _ => unreachable!(),
+    };
+
+    let nb_address = get_opt_arg(&mut args, "address");
+
+    // Fetch data.
+    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+    let xpath_instance = format!(
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
+    );
+
+    let mut xpath_neighbor = format!("ietf-rip:rip/{}/neighbors/neighbor", afi);
+
+    if let Some(nb_address) = &nb_address {
+        xpath_neighbor =
+            format!("{}[{}='{}']", xpath_neighbor, address, nb_address);
+    }
+
+    let data = fetch_data(session, DataType::All, xpath_req)?;
+
+    // Iterate over RIP instances.
+    for dnode in data.find_xpath(&xpath_instance).unwrap() {
+        let instance = dnode.child_value("name");
+
+        // Iterate over RIP neighbors.
+        for dnode in dnode.find_xpath(&xpath_neighbor).unwrap() {
+            // "address" keyword is used to identify the afi address type
+            writeln!(output, "{}", dnode.child_value(address)).unwrap();
+            writeln!(output, " instance: {}", instance).unwrap();
+            for dnode in dnode
+                .children()
+                .filter(|dnode| !dnode.schema().is_list_key())
+            {
+                let snode = dnode.schema();
+                let snode_name = snode.name();
+                if let Some(value) = dnode.value_canonical() {
+                    writeln!(output, " {}: {}", snode_name, value).unwrap();
+                }
+            }
+            writeln!(output).unwrap();
+        }
+    }
+
+    if let Err(error) = page_output(session, &output) {
+        println!("% failed to print data: {}", error)
+    }
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_rip_route(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    // Parse arguments.
+    let (protocol, afi, prefix) = match get_arg(&mut args, "protocol").as_str()
+    {
+        "ripv2" => (PROTOCOL_RIPV2, AFI4, "ipv4-prefix"),
+        "ripng" => (PROTOCOL_RIPNG, AFI6, "ipv6-prefix"),
+        _ => unreachable!(),
+    };
+
+    let xpath_rip_rib = format!("ietf-rip:rip/{}/routes/route", afi);
+
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(&xpath_rip_rib)
+        .filter_list_key(prefix, get_opt_arg(&mut args, "prefix"))
+        .column_leaf("Prefix", prefix)
+        .column_leaf("Metric", "metric")
+        .column_leaf("Type", "route-type")
+        .column_leaf("Tag", "route-tag")
+        .column_leaf("Nexthop Interface", "interface")
+        .column_leaf("Nexthop Address", "next-hop")
+        .show()?;
+
+    Ok(false)
+}
