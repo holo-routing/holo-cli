@@ -1508,6 +1508,22 @@ pub(crate) fn cmd_show_mpls_ldp_binding_address(
         .filter_list_key("address", get_opt_arg(&mut args, "address"))
         .column_leaf("Address", "address")
         .column_leaf("Advertisement type", "advertisement-type")
+        .column_from_fn(
+            "Nexthop",
+            Box::new(|dnode| {
+                let mut output = String::new();
+                if dnode.child_value("advertisement-type") == "advertised" {
+                    output = "-".to_string();
+                } else {
+                    for dnode in dnode.children() {
+                        let nh = dnode.child_value("lsr-id");
+                        let lsi = dnode.child_value("label-space-id");
+                        output = format!("{}:{}", nh, lsi)
+                    }
+                }
+                output
+            }),
+        )
         .show()?;
 
     Ok(false)
