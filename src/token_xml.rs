@@ -101,6 +101,22 @@ fn parse_tag_token(
             internal_commands::cmd_show_rip_neighbor_detail
         }
         "cmd_show_rip_route" => internal_commands::cmd_show_rip_route,
+        "cmd_show_mpls_ldp_interface" => {
+            internal_commands::cmd_show_mpls_ldp_interface
+        }
+        "cmd_show_mpls_ldp_interface_detail" => {
+            internal_commands::cmd_show_mpls_ldp_interface_detail
+        }
+        "cmd_show_mpls_ldp_peer" => internal_commands::cmd_show_mpls_ldp_peer,
+        "cmd_show_mpls_ldp_peer_detail" => {
+            internal_commands::cmd_show_mpls_ldp_peer_detail
+        }
+        "cmd_show_mpls_ldp_binding_address" => {
+            internal_commands::cmd_show_mpls_ldp_binding_address
+        }
+        "cmd_show_mpls_ldp_binding_fec" => {
+            internal_commands::cmd_show_mpls_ldp_binding_fec
+        }
         _ => panic!("unknown command name: {}", name),
     });
 
