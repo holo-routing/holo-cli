@@ -125,7 +125,7 @@ impl Client for GrpcClient {
 
     fn validate_candidate(
         &mut self,
-        candidate: &DataTree,
+        candidate: &DataTree<'static>,
     ) -> Result<(), Error> {
         let config = {
             let encoding = proto::Encoding::Lyb as i32;
@@ -148,8 +148,8 @@ impl Client for GrpcClient {
 
     fn commit_candidate(
         &mut self,
-        running: &DataTree,
-        candidate: &DataTree,
+        running: &DataTree<'static>,
+        candidate: &DataTree<'static>,
         comment: Option<String>,
     ) -> Result<(), Error> {
         let operation = proto::commit_request::Operation::Change as i32;

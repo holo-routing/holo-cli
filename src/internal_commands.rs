@@ -38,7 +38,7 @@ struct YangTableColumn {
 
 enum YangTableValue {
     Leaf(&'static str),
-    Fn(Box<dyn Fn(&DataNodeRef<'_>) -> String>),
+    Fn(Box<dyn Fn(&DataNodeRef<'_, '_>) -> String>),
 }
 
 // ===== impl YangTableBuilder =====
@@ -90,7 +90,7 @@ impl<'a> YangTableBuilder<'a> {
     pub fn column_from_fn(
         mut self,
         title: &'static str,
-        cb: Box<dyn Fn(&DataNodeRef<'_>) -> String>,
+        cb: Box<dyn Fn(&DataNodeRef<'_, '_>) -> String>,
     ) -> Self {
         if let Some((_, columns)) = self.paths.last_mut() {
             columns.push(YangTableColumn {
@@ -105,7 +105,7 @@ impl<'a> YangTableBuilder<'a> {
     // and columns.
     fn show_path(
         table: &mut Table,
-        dnode: DataNodeRef<'_>,
+        dnode: DataNodeRef<'_, '_>,
         paths: &[(String, Vec<YangTableColumn>)],
         values: Vec<String>,
     ) {
@@ -243,7 +243,7 @@ fn fetch_data(
     session: &mut Session,
     data_type: DataType,
     xpath: &str,
-) -> Result<DataTree, String> {
+) -> Result<DataTree<'static>, String> {
     let yang_ctx = YANG_CTX.get().unwrap();
     let data_format = DataFormat::LYB;
     let data = session
@@ -269,7 +269,7 @@ pub trait DataNodeRefExt {
     fn relative_opt_value(&self, xpath: &str) -> Option<String>;
 }
 
-impl<'a> DataNodeRefExt for DataNodeRef<'a> {
+impl<'a, 'b> DataNodeRefExt for DataNodeRef<'a, 'b> {
     fn child_value(&self, name: &str) -> String {
         self.child_opt_value(name).unwrap_or("-".to_owned())
     }
@@ -455,7 +455,10 @@ pub(crate) fn cmd_validate(
 
 // ===== "show <candidate|running>" =====
 
-fn cmd_show_config_cmds(config: &DataTree, with_defaults: bool) -> String {
+fn cmd_show_config_cmds(
+    config: &DataTree<'static>,
+    with_defaults: bool,
+) -> String {
     let mut output = String::new();
 
     // Iterate over data nodes that represent full commands.
@@ -494,7 +497,7 @@ fn cmd_show_config_cmds(config: &DataTree, with_defaults: bool) -> String {
                 let snode = iter.schema();
                 snode.kind() != SchemaNodeKind::List
             })
-            .collect::<Vec<DataNodeRef<'_>>>()
+            .collect::<Vec<DataNodeRef<'_, '_>>>()
             .iter()
             .rev()
         {
@@ -521,7 +524,7 @@ fn cmd_show_config_cmds(config: &DataTree, with_defaults: bool) -> String {
 }
 
 fn cmd_show_config_yang(
-    config: &DataTree,
+    config: &DataTree<'static>,
     format: DataFormat,
     with_defaults: bool,
 ) -> Result<String, String> {

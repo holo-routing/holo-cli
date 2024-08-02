@@ -27,8 +27,8 @@ pub struct Session {
     prompt: String,
     use_pager: bool,
     mode: CommandMode,
-    running: DataTree,
-    candidate: Option<DataTree>,
+    running: DataTree<'static>,
+    candidate: Option<DataTree<'static>>,
     client: Box<dyn Client>,
 }
 
@@ -271,7 +271,9 @@ impl Session {
         Ok(())
     }
 
-    fn validate_configuration_yang(config: &mut DataTree) -> Result<(), Error> {
+    fn validate_configuration_yang(
+        config: &mut DataTree<'static>,
+    ) -> Result<(), Error> {
         config
             .validate(DataValidationFlags::NO_STATE)
             .map_err(Error::ValidateConfig)
@@ -280,7 +282,7 @@ impl Session {
     pub(crate) fn get_configuration(
         &mut self,
         config_type: ConfigurationType,
-    ) -> &DataTree {
+    ) -> &DataTree<'static> {
         match config_type {
             ConfigurationType::Running => &self.running,
             ConfigurationType::Candidate => self.candidate.as_ref().unwrap(),
