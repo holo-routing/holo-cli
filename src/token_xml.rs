@@ -83,6 +83,9 @@ fn parse_tag_token(
         "cmd_show_config_changes" => internal_commands::cmd_show_config_changes,
         "cmd_show_state" => internal_commands::cmd_show_state,
         "cmd_show_yang_modules" => internal_commands::cmd_show_yang_modules,
+        "cmd_show_isis_interface" => internal_commands::cmd_show_isis_interface,
+        "cmd_show_isis_adjacency" => internal_commands::cmd_show_isis_adjacency,
+        "cmd_show_isis_database" => internal_commands::cmd_show_isis_database,
         "cmd_show_ospf_interface" => internal_commands::cmd_show_ospf_interface,
         "cmd_show_ospf_interface_detail" => {
             internal_commands::cmd_show_ospf_interface_detail

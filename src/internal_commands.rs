@@ -664,6 +664,77 @@ pub(crate) fn cmd_show_yang_modules(
     Ok(false)
 }
 
+// ===== IS-IS "show" commands =====
+
+const PROTOCOL_ISIS: &str = "ietf-isis:isis";
+const XPATH_ISIS_INTERFACE: &str = "ietf-isis:isis/interfaces/interface";
+const XPATH_ISIS_ADJACENCY: &str = "adjacencies/adjacency";
+const XPATH_ISIS_DATABASE: &str = "ietf-isis:isis/database/levels";
+const XPATH_ISIS_LSP: &str = "lsp";
+
+pub(crate) fn cmd_show_isis_interface(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(PROTOCOL_ISIS))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_ISIS_INTERFACE)
+        .filter_list_key("name", get_opt_arg(&mut args, "name"))
+        .column_leaf("Name", "name")
+        .column_leaf("Circuit ID", "circuit-id")
+        .column_leaf("State", "state")
+        .show()?;
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_isis_adjacency(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(PROTOCOL_ISIS))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_ISIS_INTERFACE)
+        .filter_list_key("name", get_opt_arg(&mut args, "name"))
+        .column_leaf("Interface", "name")
+        .xpath(XPATH_ISIS_ADJACENCY)
+        .column_leaf("System ID", "neighbor-sysid")
+        .column_leaf("SNPA", "neighbor-snpa")
+        .column_leaf("Level", "usage")
+        .column_leaf("State", "state")
+        .column_leaf("Holdtime", "hold-timer")
+        .show()?;
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_isis_database(
+    _commands: &Commands,
+    session: &mut Session,
+    _args: ParsedArgs,
+) -> Result<bool, String> {
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(PROTOCOL_ISIS))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_ISIS_DATABASE)
+        .column_leaf("Level", "level")
+        .xpath(XPATH_ISIS_LSP)
+        .column_leaf("LSP ID", "lsp-id")
+        .column_leaf("Sequence", "sequence")
+        .column_leaf("Checksum", "checksum")
+        .column_leaf("Lifetime", "remaining-lifetime")
+        .show()?;
+
+    Ok(false)
+}
+
 // ===== OSPF "show" commands =====
 
 const PROTOCOL_OSPFV2: &str = "ietf-ospf:ospfv2";

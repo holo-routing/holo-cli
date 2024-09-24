@@ -29,6 +29,14 @@
       <token name="yang" help="YANG information.">
         <token name="modules" help="Show loaded YANG modules." cmd="cmd_show_yang_modules"/>
       </token>
+      <!-- IS-IS show commands -->
+      <token name="isis" argument="protocol" help="IS-IS information">
+        <token name="interface" help="Interface information" cmd="cmd_show_isis_interface">
+          <token name="NAME" help="Interface name" argument="name" kind="string" cmd="cmd_show_isis_interface"/>
+        </token>
+	<token name="database" help="Link state database" cmd="cmd_show_isis_database"/>
+	<token name="adjacency" help="Adjacency information" cmd="cmd_show_isis_adjacency"/>
+      </token>
       <!-- OSPF show commands -->
       <token name="ospfv2" argument="protocol" help="OSPFv2 information">
         <token name="interface" help="Interface information" cmd="cmd_show_ospf_interface">
