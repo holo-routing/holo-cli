@@ -747,6 +747,7 @@ pub(crate) fn cmd_show_isis_interface(
         .xpath(XPATH_ISIS_INTERFACE)
         .filter_list_key("name", get_opt_arg(&mut args, "name"))
         .column_leaf("Name", "name")
+        .column_leaf("Type", "interface-type")
         .column_leaf("Circuit ID", "circuit-id")
         .column_leaf("State", "state")
         .show()?;
