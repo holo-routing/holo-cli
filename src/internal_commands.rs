@@ -170,13 +170,11 @@ impl<'a> YangTableBuilder<'a> {
                         match format {
                             YangValueDisplayFormat::Raw => value,
                             YangValueDisplayFormat::Hex16 => {
-                                let value =
-                                    u32::from_str_radix(&value, 10).unwrap();
+                                let value = value.parse::<u32>().unwrap();
                                 format!("{:#06x}", value)
                             }
                             YangValueDisplayFormat::Hex32 => {
-                                let value =
-                                    u32::from_str_radix(&value, 10).unwrap();
+                                let value = value.parse::<u32>().unwrap();
                                 format!("{:#010x}", value)
                             }
                         }
@@ -332,7 +330,7 @@ pub trait DataNodeRefExt {
     fn relative_opt_value(&self, xpath: &str) -> Option<String>;
 }
 
-impl<'a, 'b> DataNodeRefExt for DataNodeRef<'a, 'b> {
+impl DataNodeRefExt for DataNodeRef<'_, '_> {
     fn child_value(&self, name: &str) -> String {
         self.child_opt_value(name).unwrap_or("-".to_owned())
     }
