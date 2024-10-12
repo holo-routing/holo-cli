@@ -596,8 +596,7 @@ fn cmd_show_config_yang(
 
     let data = config
         .print_string(format, flags)
-        .map_err(|error| format!("failed to print configuration: {}", error))?
-        .unwrap_or_default();
+        .map_err(|error| format!("failed to print configuration: {}", error))?;
     Ok(data)
 }
 

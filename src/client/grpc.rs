@@ -131,8 +131,7 @@ impl Client for GrpcClient {
             let encoding = proto::Encoding::Lyb as i32;
             let bytes = candidate
                 .print_bytes(DataFormat::LYB, DataPrinterFlags::WITH_SIBLINGS)
-                .expect("Failed to encode data tree")
-                .unwrap_or_default();
+                .expect("Failed to encode data tree");
 
             Some(proto::DataTree {
                 encoding,
@@ -160,8 +159,7 @@ impl Client for GrpcClient {
                 .expect("Failed to compare configurations");
             let bytes = diff
                 .print_bytes(DataFormat::LYB, DataPrinterFlags::WITH_SIBLINGS)
-                .expect("Failed to encode data diff")
-                .unwrap_or_default();
+                .expect("Failed to encode data diff");
 
             Some(proto::DataTree {
                 encoding,
