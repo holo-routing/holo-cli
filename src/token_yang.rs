@@ -7,13 +7,13 @@
 use std::fmt::Write;
 use std::os::raw::c_void;
 
-use holo_yang::YANG_CTX;
 use indextree::NodeId;
 use itertools::Itertools;
 use yang3::schema::{DataValueType, SchemaNode, SchemaNodeKind};
 
 use crate::parser::ParsedArgs;
 use crate::token::{Action, Commands, Token, TokenKind};
+use crate::YANG_CTX;
 
 pub(crate) fn gen_cmds(commands: &mut Commands) {
     // Iterate over top-level YANG nodes.

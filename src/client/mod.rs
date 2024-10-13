@@ -30,7 +30,11 @@ pub trait Client: Send + std::fmt::Debug {
         Self: Sized;
 
     // Retrieve and load all supported YANG modules.
-    fn load_modules(&mut self, yang_ctx: &mut yang3::context::Context);
+    fn load_modules(
+        &mut self,
+        dest: &'static str,
+        yang_ctx: &mut yang3::context::Context,
+    );
 
     // Retrieve configuration data, state data or both.
     fn get(

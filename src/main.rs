@@ -14,12 +14,11 @@ mod token;
 mod token_xml;
 mod token_yang;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use clap::{App, Arg};
-use holo_yang as yang;
-use holo_yang::YANG_CTX;
 use reedline::Signal;
+use yang3::context::{Context, ContextFlags};
 
 use crate::client::grpc::GrpcClient;
 use crate::client::Client;
@@ -27,6 +26,12 @@ use crate::error::Error;
 use crate::session::{CommandMode, Session};
 use crate::terminal::CliPrompt;
 use crate::token::{Action, Commands};
+
+// Global YANG context.
+pub static YANG_CTX: OnceLock<Arc<Context>> = OnceLock::new();
+
+// Default YANG modules cache directory.
+pub const YANG_MODULES_DIR: &str = "/usr/local/share/holo-cli/modules";
 
 pub struct Cli {
     commands: Commands,
@@ -152,14 +157,12 @@ fn main() {
         )
         .get_matches();
 
+    // Connect to the daemon.
     let addr = matches
         .value_of("address")
         .unwrap_or("http://[::1]:50051")
         .to_string();
     let grpc_addr: &'static str = Box::leak(addr.into_boxed_str());
-
-    // Initialize YANG context and gRPC client.
-    let mut yang_ctx = yang::new_context();
     let mut client = match GrpcClient::connect(grpc_addr) {
         Ok(client) => client,
         Err(error) => {
@@ -168,7 +171,25 @@ fn main() {
             std::process::exit(1);
         }
     };
-    client.load_modules(&mut yang_ctx);
+
+    // Initialize YANG context.
+    let mut yang_ctx = Context::new(
+        ContextFlags::NO_YANGLIBRARY | ContextFlags::PREFER_SEARCHDIRS,
+    )
+    .unwrap();
+    yang_ctx.set_searchdir(YANG_MODULES_DIR).unwrap();
+
+    // Ensure the YANG modules cache directory exists, creating it if necessary.
+    if let Err(error) = std::fs::create_dir_all(YANG_MODULES_DIR) {
+        eprintln!(
+            "Failed to create YANG modules directory ({}): {}",
+            YANG_MODULES_DIR, error
+        );
+        std::process::exit(1);
+    }
+
+    // Load YANG modules.
+    client.load_modules(grpc_addr, &mut yang_ctx);
     YANG_CTX.set(Arc::new(yang_ctx)).unwrap();
 
     // Initialize CLI master structure.

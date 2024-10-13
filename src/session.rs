@@ -6,7 +6,6 @@
 
 use derive_new::new;
 use enum_as_inner::EnumAsInner;
-use holo_yang::YANG_CTX;
 use indextree::NodeId;
 use yang3::data::{
     Data, DataFormat, DataParserFlags, DataTree, DataValidationFlags,
@@ -17,7 +16,7 @@ use crate::client::{Client, DataType, DataValue};
 use crate::error::Error;
 use crate::parser::ParsedArgs;
 use crate::token::Commands;
-use crate::token_yang;
+use crate::{token_yang, YANG_CTX};
 
 static DEFAULT_HOSTNAME: &str = "holo";
 

@@ -7,7 +7,6 @@
 use std::fmt::Write;
 use std::process::{Child, Command, Stdio};
 
-use holo_yang::YANG_CTX;
 use indextree::NodeId;
 use prettytable::{format, row, Table};
 use similar::TextDiff;
@@ -21,6 +20,7 @@ use crate::client::{DataType, DataValue};
 use crate::parser::ParsedArgs;
 use crate::session::{CommandMode, ConfigurationType, Session};
 use crate::token::{Commands, TokenKind};
+use crate::YANG_CTX;
 
 const XPATH_PROTOCOL: &str =
     "/ietf-routing:routing/control-plane-protocols/control-plane-protocol";
