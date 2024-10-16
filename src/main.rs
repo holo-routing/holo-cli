@@ -177,7 +177,6 @@ fn main() {
         ContextFlags::NO_YANGLIBRARY | ContextFlags::PREFER_SEARCHDIRS,
     )
     .unwrap();
-    yang_ctx.set_searchdir(YANG_MODULES_DIR).unwrap();
 
     // Ensure the YANG modules cache directory exists, creating it if necessary.
     if let Err(error) = std::fs::create_dir_all(YANG_MODULES_DIR) {
@@ -187,6 +186,9 @@ fn main() {
         );
         std::process::exit(1);
     }
+
+    // Set YANG search directory.
+    yang_ctx.set_searchdir(YANG_MODULES_DIR).unwrap();
 
     // Load YANG modules.
     client.load_modules(grpc_addr, &mut yang_ctx);
