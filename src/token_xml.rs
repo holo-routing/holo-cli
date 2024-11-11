@@ -120,6 +120,7 @@ fn parse_tag_token(
         "cmd_show_mpls_ldp_binding_fec" => {
             internal_commands::cmd_show_mpls_ldp_binding_fec
         }
+        "cmd_show_vrrp_details" => internal_commands::cmd_show_vrrp_details,
         _ => panic!("unknown command name: {}", name),
     });
 
