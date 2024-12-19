@@ -192,8 +192,13 @@ impl<'a> YangTableBuilder<'a> {
     }
 
     // Builds and displays the table.
-    pub fn show(self) -> Result<(), String> {
-        let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+    pub fn show(self, xpath_req: Option<String>) -> Result<(), String> {
+        // have a default xpath (ietf-routing:routing/control-plane-protocols)
+        // which is used by most of the other protocols.
+        let xpath_req = xpath_req.unwrap_or(String::from(
+            "/ietf-routing:routing/control-plane-protocols",
+        ));
+        let xpath_req = xpath_req.as_str();
 
         // Fetch data.
         let data = fetch_data(self.session, self.data_type, xpath_req)?;
@@ -724,6 +729,37 @@ pub(crate) fn cmd_show_yang_modules(
     Ok(false)
 }
 
+// ===== VRRP "show" commands =====
+
+const XPATH_INTERFACE: &str = "/ietf-interfaces:interfaces/interface";
+const XPATH_INTERFACE_IPV4: &str = "ietf-ip:ipv4";
+const PROTOCOL_VRRP: &str = "ietf-vrrp:vrrp";
+
+pub(crate) fn cmd_show_vrrp_details(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_INTERFACE)
+        .filter_list_key("name", get_opt_arg(&mut args, "name")) // filter by interface name
+        .xpath(XPATH_INTERFACE_IPV4)
+        .xpath(PROTOCOL_VRRP)
+        .xpath("vrrp-instance")
+        .filter_list_key("vrid", get_opt_arg(&mut args, "vrid")) // filter by vrid
+        .column_leaf("VRID", "vrid")
+        .xpath("statistics")
+        .column_leaf("Master Transitions", "master-transitions")
+        .column_leaf("Adverts received", "advertisement-rcvd")
+        .column_leaf("Adverts sent", "advertisement-sent")
+        .column_leaf("Interval Errors", "interval-errors")
+        .column_leaf("Priority Zero Pkts Received", "priority-zero-pkts-rcvd")
+        .column_leaf("Priority Zero Pkts Sent", "priority-zero-pkts-sent")
+        .column_leaf("Packet Length Errors", "packet-length-errors")
+        .show(Some(String::from("/ietf-interfaces:interfaces")))?;
+    Ok(false)
+}
+
 // ===== IS-IS "show" commands =====
 
 const PROTOCOL_ISIS: &str = "ietf-isis:isis";
@@ -747,7 +783,7 @@ pub(crate) fn cmd_show_isis_interface(
         .column_leaf("Type", "interface-type")
         .column_leaf("Circuit ID", "circuit-id")
         .column_leaf("State", "state")
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
@@ -770,7 +806,7 @@ pub(crate) fn cmd_show_isis_adjacency(
         .column_leaf("Level", "usage")
         .column_leaf("State", "state")
         .column_leaf("Holdtime", "hold-timer")
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
@@ -791,7 +827,7 @@ pub(crate) fn cmd_show_isis_database(
         .column_leaf_hex32("Sequence", "sequence")
         .column_leaf_hex16("Checksum", "checksum")
         .column_leaf("Lifetime", "remaining-lifetime")
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
@@ -840,7 +876,7 @@ pub(crate) fn cmd_show_ospf_interface(
                 format!("{} ({})", interval, remaining)
             }),
         )
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
@@ -951,7 +987,7 @@ pub(crate) fn cmd_show_ospf_neighbor(
                 format!("{} ({})", interval, remaining)
             }),
         )
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
@@ -1071,7 +1107,7 @@ pub(crate) fn cmd_show_ospf_route(
         .xpath(XPATH_OSPF_NEXTHOP)
         .column_leaf("Nexthop Interface", "outgoing-interface")
         .column_leaf("Nexthop Address", "next-hop")
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
@@ -1103,7 +1139,7 @@ pub(crate) fn cmd_show_rip_interface(
         .filter_list_key("interface", get_opt_arg(&mut args, "name"))
         .column_leaf("Name", "interface")
         .column_leaf("State", "oper-status")
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
@@ -1202,7 +1238,7 @@ pub(crate) fn cmd_show_rip_neighbor(
         .filter_list_key(address, get_opt_arg(&mut args, "address"))
         .column_leaf("Address", address)
         .column_leaf("Last update", "last-update")
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
@@ -1296,7 +1332,7 @@ pub(crate) fn cmd_show_rip_route(
         .column_leaf("Tag", "route-tag")
         .column_leaf("Nexthop Interface", "interface")
         .column_leaf("Nexthop Address", "next-hop")
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
@@ -1338,7 +1374,7 @@ pub(crate) fn cmd_show_mpls_ldp_interface(
         .column_leaf("Adjacent address", "adjacent-address")
         .xpath(XPATH_MPLS_LDP_ADJACENCY_PEER)
         .column_leaf("Neighbor lsr-id", "lsr-id")
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
@@ -1462,7 +1498,7 @@ pub(crate) fn cmd_show_mpls_ldp_peer(
         .xpath(XPATH_MPLS_LDP_ADJACENCY)
         .column_leaf("Local address", "local-address")
         .column_leaf("Adjacent address", "adjacent-address")
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
@@ -1659,11 +1695,10 @@ pub(crate) fn cmd_show_mpls_ldp_binding_address(
                 output
             }),
         )
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }
-
 pub(crate) fn cmd_show_mpls_ldp_binding_fec(
     _commands: &Commands,
     session: &mut Session,
@@ -1708,7 +1743,7 @@ pub(crate) fn cmd_show_mpls_ldp_binding_fec(
             }),
         )
         .column_leaf("In use", "used-in-forwarding")
-        .show()?;
+        .show(None)?;
 
     Ok(false)
 }

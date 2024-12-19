@@ -27,10 +27,7 @@ pub type ParsedArgs = VecDeque<(String, String)>;
 pub(crate) fn normalize_input_line(line: &str) -> Option<String> {
     // Ignore "!" comments.
     // TODO: allow "!" within user input like interface descriptions
-    let line = match line.split('!').next() {
-        Some(line) => line,
-        None => return None,
-    };
+    let line = line.split('!').next()?;
 
     // Remove redundant whitespaces.
     let line = line.split_whitespace().collect::<Vec<_>>().join(" ");

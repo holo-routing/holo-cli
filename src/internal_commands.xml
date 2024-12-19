@@ -18,10 +18,10 @@
       </token>
       <token name="state" help="Show operational state." cmd="cmd_show_state">
         <token name="xpath" help="XPath expression.">
-  	  <token name="xpath" argument="xpath" kind="string" help="XPath expression." cmd="cmd_show_state">
+          <token name="xpath" argument="xpath" kind="string" help="XPath expression." cmd="cmd_show_state">
             <token name="format" help="Configuration format.">
               <token name="json" argument="format" help="JSON output format." cmd="cmd_show_state"/>
-	      <token name="xml" argument="format" help="XML output format." cmd="cmd_show_state"/>
+              <token name="xml" argument="format" help="XML output format." cmd="cmd_show_state"/>
             </token>
           </token>
         </token>
@@ -34,9 +34,20 @@
         <token name="interface" help="Interface information" cmd="cmd_show_isis_interface">
           <token name="NAME" help="Interface name" argument="name" kind="string" cmd="cmd_show_isis_interface"/>
         </token>
-	<token name="database" help="Link state database" cmd="cmd_show_isis_database"/>
-	<token name="adjacency" help="Adjacency information" cmd="cmd_show_isis_adjacency"/>
+        <token name="database" help="Link state database" cmd="cmd_show_isis_database"/>
+        <token name="adjacency" help="Adjacency information" cmd="cmd_show_isis_adjacency"/>
       </token>
+
+      <!-- VRRP show commands -->
+      <token name="vrrp" argument="protocol" help="VRRP information" cmd="cmd_show_vrrp_details">
+        <token name="interface" help="Filter By Parent Interface" cmd="cmd_show_vrrp_details">
+          <token name="NAME" help="Interface Name" argument="name" kind="string" cmd="cmd_show_vrrp_details"/>
+        </token>
+        <token name="vrid" help="Filter By VRID" cmd="cmd_show_vrrp_details">
+          <token name="VRID" help="VRID" argument="vrid" kind="string" cmd="cmd_show_vrrp_details"/>
+        </token>
+      </token>
+
       <!-- OSPF show commands -->
       <token name="ospfv2" argument="protocol" help="OSPFv2 information">
         <token name="interface" help="Interface information" cmd="cmd_show_ospf_interface">
