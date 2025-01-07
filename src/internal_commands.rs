@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 //
 
+use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::process::{Child, Command, Stdio};
 
@@ -757,6 +758,7 @@ pub(crate) fn cmd_show_isis_adjacency(
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
+    let hostnames = isis_hostnames(session)?;
     YangTableBuilder::new(session, DataType::All)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_ISIS))
@@ -765,7 +767,13 @@ pub(crate) fn cmd_show_isis_adjacency(
         .filter_list_key("name", get_opt_arg(&mut args, "name"))
         .column_leaf("Interface", "name")
         .xpath(XPATH_ISIS_ADJACENCY)
-        .column_leaf("System ID", "neighbor-sysid")
+        .column_from_fn(
+            "System ID",
+            Box::new(move |dnode| {
+                let system_id = dnode.child_value("neighbor-sysid");
+                hostnames.get(&system_id).cloned().unwrap_or(system_id)
+            }),
+        )
         .column_leaf("SNPA", "neighbor-snpa")
         .column_leaf("Level", "usage")
         .column_leaf("State", "state")
@@ -780,6 +788,7 @@ pub(crate) fn cmd_show_isis_database(
     session: &mut Session,
     _args: ParsedArgs,
 ) -> Result<bool, String> {
+    let hostnames = isis_hostnames(session)?;
     YangTableBuilder::new(session, DataType::All)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_ISIS))
@@ -787,13 +796,51 @@ pub(crate) fn cmd_show_isis_database(
         .xpath(XPATH_ISIS_DATABASE)
         .column_leaf("Level", "level")
         .xpath(XPATH_ISIS_LSP)
-        .column_leaf("LSP ID", "lsp-id")
+        .column_from_fn(
+            "LSP ID",
+            Box::new(move |dnode| {
+                let mut lsp_id = dnode.child_value("lsp-id");
+                let system_id = &lsp_id[..14];
+                if let Some(hostname) = hostnames.get(system_id) {
+                    lsp_id.replace_range(..14, hostname);
+                }
+                lsp_id
+            }),
+        )
         .column_leaf_hex32("Sequence", "sequence")
         .column_leaf_hex16("Checksum", "checksum")
         .column_leaf("Lifetime", "remaining-lifetime")
         .show()?;
 
     Ok(false)
+}
+
+fn isis_hostnames(
+    session: &mut Session,
+) -> Result<BTreeMap<String, String>, String> {
+    let xpath = format!(
+        "{}[type='{}'][name='{}']/ietf-isis:isis/hostnames",
+        XPATH_PROTOCOL, PROTOCOL_ISIS, "main"
+    );
+
+    // Fetch hostname mappings.
+    let data = fetch_data(session, DataType::State, &xpath)?;
+
+    // Collect hostname mappings into a binary tree.
+    let hostnames = data
+        .find_path(&xpath)
+        .unwrap()
+        .find_xpath("hostname")
+        .unwrap()
+        .filter_map(|dnode| {
+            Some((
+                dnode.child_opt_value("system-id")?,
+                dnode.child_opt_value("hostname")?,
+            ))
+        })
+        .collect();
+
+    Ok(hostnames)
 }
 
 // ===== OSPF "show" commands =====

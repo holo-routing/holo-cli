@@ -4,6 +4,8 @@
 // SPDX-License-Identifier: MIT
 //
 
+#![feature(let_chains)]
+
 mod client;
 mod error;
 mod internal_commands;
