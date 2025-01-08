@@ -86,6 +86,7 @@ fn parse_tag_token(
         "cmd_show_isis_interface" => internal_commands::cmd_show_isis_interface,
         "cmd_show_isis_adjacency" => internal_commands::cmd_show_isis_adjacency,
         "cmd_show_isis_database" => internal_commands::cmd_show_isis_database,
+        "cmd_show_isis_route" => internal_commands::cmd_show_isis_route,
         "cmd_show_ospf_interface" => internal_commands::cmd_show_ospf_interface,
         "cmd_show_ospf_interface_detail" => {
             internal_commands::cmd_show_ospf_interface_detail

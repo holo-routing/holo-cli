@@ -732,6 +732,8 @@ const XPATH_ISIS_INTERFACE: &str = "ietf-isis:isis/interfaces/interface";
 const XPATH_ISIS_ADJACENCY: &str = "adjacencies/adjacency";
 const XPATH_ISIS_DATABASE: &str = "ietf-isis:isis/database/levels";
 const XPATH_ISIS_LSP: &str = "lsp";
+const XPATH_ISIS_ROUTE: &str = "ietf-isis:isis/local-rib/route";
+const XPATH_ISIS_NEXTHOP: &str = "next-hops/next-hop";
 
 pub(crate) fn cmd_show_isis_interface(
     _commands: &Commands,
@@ -810,6 +812,27 @@ pub(crate) fn cmd_show_isis_database(
         .column_leaf_hex32("Sequence", "sequence")
         .column_leaf_hex16("Checksum", "checksum")
         .column_leaf("Lifetime", "remaining-lifetime")
+        .show()?;
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_isis_route(
+    _commands: &Commands,
+    session: &mut Session,
+    _args: ParsedArgs,
+) -> Result<bool, String> {
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(PROTOCOL_ISIS))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_ISIS_ROUTE)
+        .column_leaf("Prefix", "prefix")
+        .column_leaf("Metric", "metric")
+        .column_leaf("Level", "level")
+        .xpath(XPATH_ISIS_NEXTHOP)
+        .column_leaf("Nexthop Interface", "outgoing-interface")
+        .column_leaf("Nexthop Address", "next-hop")
         .show()?;
 
     Ok(false)

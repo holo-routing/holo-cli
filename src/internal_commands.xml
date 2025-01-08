@@ -35,6 +35,7 @@
           <token name="NAME" help="Interface name" argument="name" kind="string" cmd="cmd_show_isis_interface"/>
         </token>
 	<token name="database" help="Link state database" cmd="cmd_show_isis_database"/>
+	<token name="route" help="Routing table" cmd="cmd_show_isis_route"/>
 	<token name="adjacency" help="Adjacency information" cmd="cmd_show_isis_adjacency"/>
       </token>
       <!-- OSPF show commands -->
