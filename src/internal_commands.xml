@@ -52,6 +52,8 @@
             <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_neighbor_detail"/>
           </token>
         </token>
+        <token name="hostnames" help="Router Hostnames" cmd="cmd_show_ospf_hostnames">
+        </token>
         <token name="route" help="Route information" cmd="cmd_show_ospf_route">
           <token name="prefix" help="IPv4 prefix" argument="prefix" kind="string" cmd="cmd_show_ospf_route"/>
         </token>
@@ -71,6 +73,8 @@
         </token>
         <token name="route" help="Route information" cmd="cmd_show_ospf_route">
           <token name="prefix" help="IPv4 prefix" argument="prefix" kind="string" cmd="cmd_show_ospf_route"/>
+        </token>
+        <token name="hostnames" help="Router Hostnames" cmd="cmd_show_ospf_hostnames">
         </token>
       </token>
       <!-- RIP show commands -->
