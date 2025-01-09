@@ -96,6 +96,7 @@ fn parse_tag_token(
             internal_commands::cmd_show_ospf_neighbor_detail
         }
         "cmd_show_ospf_route" => internal_commands::cmd_show_ospf_route,
+        "cmd_show_ospf_hostnames" => internal_commands::cmd_show_ospf_hostnames,
         "cmd_show_rip_interface" => internal_commands::cmd_show_rip_interface,
         "cmd_show_rip_interface_detail" => {
             internal_commands::cmd_show_rip_interface_detail

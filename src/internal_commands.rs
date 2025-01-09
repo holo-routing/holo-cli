@@ -875,6 +875,8 @@ const XPATH_OSPF_INTERFACE: &str = "interfaces/interface";
 const XPATH_OSPF_NEIGHBOR: &str = "neighbors/neighbor";
 const XPATH_OSPF_RIB: &str = "ietf-ospf:ospf/local-rib/route";
 const XPATH_OSPF_NEXTHOP: &str = "next-hops/next-hop";
+const XPATH_OSPF_HOSTNAMES: &str =
+    "ietf-ospf:ospf/holo-ospf:hostnames/hostname";
 
 pub(crate) fn cmd_show_ospf_interface(
     _commands: &Commands,
@@ -1146,6 +1148,28 @@ pub(crate) fn cmd_show_ospf_route(
     Ok(false)
 }
 
+pub(crate) fn cmd_show_ospf_hostnames(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ospfv2" => PROTOCOL_OSPFV2,
+        "ospfv3" => PROTOCOL_OSPFV3,
+        _ => unreachable!(),
+    };
+
+    YangTableBuilder::new(session, DataType::State)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_OSPF_HOSTNAMES)
+        .filter_list_key("prefix", get_opt_arg(&mut args, "router-id"))
+        .column_leaf("Router ID", "router-id")
+        .column_leaf("Hostname", "hostname")
+        .show()?;
+    Ok(false)
+}
 // ===== RIP "show" commands =====
 
 const PROTOCOL_RIPV2: &str = "ietf-rip:ripv2";
