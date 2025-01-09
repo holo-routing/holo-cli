@@ -39,7 +39,7 @@ struct YangTableColumn {
 
 enum YangTableValue {
     Leaf(&'static str, YangValueDisplayFormat),
-    Fn(Box<dyn Fn(&DataNodeRef<'_, '_>) -> String>),
+    Fn(Box<dyn Fn(&DataNodeRef<'_>) -> String>),
 }
 
 enum YangValueDisplayFormat {
@@ -139,7 +139,7 @@ impl<'a> YangTableBuilder<'a> {
     pub fn column_from_fn(
         mut self,
         title: &'static str,
-        cb: Box<dyn Fn(&DataNodeRef<'_, '_>) -> String>,
+        cb: Box<dyn Fn(&DataNodeRef<'_>) -> String>,
     ) -> Self {
         if let Some((_, columns)) = self.paths.last_mut() {
             columns.push(YangTableColumn {
@@ -154,7 +154,7 @@ impl<'a> YangTableBuilder<'a> {
     // and columns.
     fn show_path(
         table: &mut Table,
-        dnode: DataNodeRef<'_, '_>,
+        dnode: DataNodeRef<'_>,
         paths: &[(String, Vec<YangTableColumn>)],
         values: Vec<String>,
     ) {
@@ -331,7 +331,7 @@ pub trait DataNodeRefExt {
     fn relative_opt_value(&self, xpath: &str) -> Option<String>;
 }
 
-impl DataNodeRefExt for DataNodeRef<'_, '_> {
+impl DataNodeRefExt for DataNodeRef<'_> {
     fn child_value(&self, name: &str) -> String {
         self.child_opt_value(name).unwrap_or("-".to_owned())
     }
@@ -559,7 +559,7 @@ fn cmd_show_config_cmds(
                 let snode = iter.schema();
                 snode.kind() != SchemaNodeKind::List
             })
-            .collect::<Vec<DataNodeRef<'_, '_>>>()
+            .collect::<Vec<DataNodeRef<'_>>>()
             .iter()
             .rev()
         {
