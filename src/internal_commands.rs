@@ -999,6 +999,7 @@ pub(crate) fn cmd_show_ospf_neighbor(
         "ospfv3" => PROTOCOL_OSPFV3,
         _ => unreachable!(),
     };
+    let hostnames = ospf_hostnames(session, protocol)?;
     YangTableBuilder::new(session, DataType::All)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
@@ -1012,7 +1013,13 @@ pub(crate) fn cmd_show_ospf_neighbor(
             "neighbor-router-id=",
             get_opt_arg(&mut args, "router_id"),
         )
-        .column_leaf("Router ID", "neighbor-router-id")
+        .column_from_fn(
+            "Router ID",
+            Box::new(move |dnode| {
+                let router_id = dnode.child_value("neighbor-router-id");
+                hostnames.get(&router_id).cloned().unwrap_or(router_id)
+            }),
+        )
         .column_leaf("Address", "address")
         .column_leaf("State", "state")
         .column_from_fn(
@@ -1170,6 +1177,36 @@ pub(crate) fn cmd_show_ospf_hostnames(
         .show()?;
     Ok(false)
 }
+
+fn ospf_hostnames(
+    session: &mut Session,
+    protocol: &str,
+) -> Result<BTreeMap<String, String>, String> {
+    let xpath = format!(
+        "{}[type='{}'][name='{}']/ietf-ospf:ospf/holo-ospf:hostnames",
+        XPATH_PROTOCOL, protocol, "main"
+    );
+
+    // Fetch hostname mappings.
+    let data = fetch_data(session, DataType::State, &xpath)?;
+
+    // Collect hostname mappings into a binary tree.
+    let hostnames = data
+        .find_path(&xpath)
+        .unwrap()
+        .find_xpath("hostname")
+        .unwrap()
+        .filter_map(|dnode| {
+            Some((
+                dnode.child_opt_value("router-id")?,
+                dnode.child_opt_value("hostname")?,
+            ))
+        })
+        .collect();
+
+    Ok(hostnames)
+}
+
 // ===== RIP "show" commands =====
 
 const PROTOCOL_RIPV2: &str = "ietf-rip:ripv2";
