@@ -870,8 +870,14 @@ fn isis_hostnames(
 
 const PROTOCOL_OSPFV2: &str = "ietf-ospf:ospfv2";
 const PROTOCOL_OSPFV3: &str = "ietf-ospf:ospfv3";
+const XPATH_OSPF_AS_LSDB: &str =
+    "database/as-scope-lsa-type/as-scope-lsas/as-scope-lsa/*/header";
 const XPATH_OSPF_AREA: &str = "ietf-ospf:ospf/areas/area";
+const XPATH_OSPF_AREA_LSDB: &str =
+    "database/area-scope-lsa-type/area-scope-lsas/area-scope-lsa/*/header";
 const XPATH_OSPF_INTERFACE: &str = "interfaces/interface";
+const XPATH_OSPF_INTERFACE_LSDB: &str =
+    "database/link-scope-lsa-type/link-scope-lsas/link-scope-lsa/*/header";
 const XPATH_OSPF_NEIGHBOR: &str = "neighbors/neighbor";
 const XPATH_OSPF_RIB: &str = "ietf-ospf:ospf/local-rib/route";
 const XPATH_OSPF_NEXTHOP: &str = "next-hops/next-hop";
@@ -1123,6 +1129,141 @@ pub(crate) fn cmd_show_ospf_neighbor_detail(
     if let Err(error) = page_output(session, &output) {
         println!("% failed to print data: {}", error)
     }
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_ospf_database_as(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ospfv2" => PROTOCOL_OSPFV2,
+        "ospfv3" => PROTOCOL_OSPFV3,
+        _ => unreachable!(),
+    };
+    let hostnames = ospf_hostnames(session, protocol)?;
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_OSPF_AS_LSDB)
+        .column_from_fn(
+            "Type",
+            Box::new(move |dnode| {
+                let lsa_type = dnode.child_value("type");
+                if lsa_type.contains("opaque-lsa") {
+                    "opaque-lsa".to_owned()
+                } else {
+                    lsa_type[17..].to_owned()
+                }
+            }),
+        )
+        .column_leaf("LSA ID", "lsa-id")
+        .column_from_fn(
+            "Adv Router",
+            Box::new(move |dnode| {
+                let router_id = dnode.child_value("adv-router");
+                hostnames.get(&router_id).cloned().unwrap_or(router_id)
+            }),
+        )
+        .column_leaf("Age", "age")
+        .column_leaf_hex32("Sequence", "seq-num")
+        .column_leaf("Checksum", "checksum")
+        .show()?;
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_ospf_database_area(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ospfv2" => PROTOCOL_OSPFV2,
+        "ospfv3" => PROTOCOL_OSPFV3,
+        _ => unreachable!(),
+    };
+    let hostnames = ospf_hostnames(session, protocol)?;
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_OSPF_AREA)
+        .column_leaf("Area", "area-id")
+        .xpath(XPATH_OSPF_AREA_LSDB)
+        .column_from_fn(
+            "Type",
+            Box::new(move |dnode| {
+                let lsa_type = dnode.child_value("type");
+                if lsa_type.contains("opaque-lsa") {
+                    "opaque-lsa".to_owned()
+                } else {
+                    lsa_type[17..].to_owned()
+                }
+            }),
+        )
+        .column_leaf("LSA ID", "lsa-id")
+        .column_from_fn(
+            "Adv Router",
+            Box::new(move |dnode| {
+                let router_id = dnode.child_value("adv-router");
+                hostnames.get(&router_id).cloned().unwrap_or(router_id)
+            }),
+        )
+        .column_leaf("Age", "age")
+        .column_leaf_hex32("Sequence", "seq-num")
+        .column_leaf("Checksum", "checksum")
+        .show()?;
+
+    Ok(false)
+}
+
+pub(crate) fn cmd_show_ospf_database_link(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ospfv2" => PROTOCOL_OSPFV2,
+        "ospfv3" => PROTOCOL_OSPFV3,
+        _ => unreachable!(),
+    };
+    let hostnames = ospf_hostnames(session, protocol)?;
+    YangTableBuilder::new(session, DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_OSPF_AREA)
+        .column_leaf("Area", "area-id")
+        .xpath(XPATH_OSPF_INTERFACE)
+        .column_leaf("Interface", "name")
+        .xpath(XPATH_OSPF_INTERFACE_LSDB)
+        .column_from_fn(
+            "Type",
+            Box::new(move |dnode| {
+                let lsa_type = dnode.child_value("type");
+                if lsa_type.contains("opaque-lsa") {
+                    "opaque-lsa".to_owned()
+                } else {
+                    lsa_type[17..].to_owned()
+                }
+            }),
+        )
+        .column_leaf("LSA ID", "lsa-id")
+        .column_from_fn(
+            "Adv Router",
+            Box::new(move |dnode| {
+                let router_id = dnode.child_value("adv-router");
+                hostnames.get(&router_id).cloned().unwrap_or(router_id)
+            }),
+        )
+        .column_leaf("Age", "age")
+        .column_leaf_hex32("Sequence", "seq-num")
+        .column_leaf("Checksum", "checksum")
+        .show()?;
 
     Ok(false)
 }

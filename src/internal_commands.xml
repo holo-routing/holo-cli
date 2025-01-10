@@ -54,6 +54,11 @@
         </token>
         <token name="hostnames" help="Router Hostnames" cmd="cmd_show_ospf_hostnames">
         </token>
+	<token name="database" help="Link state database">
+	  <token name="as" help="AS-Scope LSAs" cmd="cmd_show_ospf_database_as"/>
+	  <token name="area" help="Area-Scope LSAs" cmd="cmd_show_ospf_database_area"/>
+          <token name="link" help="Link-Scope LSAs" cmd="cmd_show_ospf_database_link"/>
+        </token>
         <token name="route" help="Route information" cmd="cmd_show_ospf_route">
           <token name="prefix" help="IPv4 prefix" argument="prefix" kind="string" cmd="cmd_show_ospf_route"/>
         </token>
@@ -70,6 +75,11 @@
           <token name="router_id" help="Neighbor Router ID" argument="router_id" kind="string" cmd="cmd_show_ospf_neighbor">
             <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_neighbor_detail"/>
           </token>
+        </token>
+	<token name="database" help="Link state database">
+	  <token name="as" help="AS-Scope LSAs" cmd="cmd_show_ospf_database_as"/>
+	  <token name="area" help="Area-Scope LSAs" cmd="cmd_show_ospf_database_area"/>
+          <token name="link" help="Link-Scope LSAs" cmd="cmd_show_ospf_database_link"/>
         </token>
         <token name="route" help="Route information" cmd="cmd_show_ospf_route">
           <token name="prefix" help="IPv4 prefix" argument="prefix" kind="string" cmd="cmd_show_ospf_route"/>

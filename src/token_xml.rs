@@ -95,6 +95,15 @@ fn parse_tag_token(
         "cmd_show_ospf_neighbor_detail" => {
             internal_commands::cmd_show_ospf_neighbor_detail
         }
+        "cmd_show_ospf_database_as" => {
+            internal_commands::cmd_show_ospf_database_as
+        }
+        "cmd_show_ospf_database_area" => {
+            internal_commands::cmd_show_ospf_database_area
+        }
+        "cmd_show_ospf_database_link" => {
+            internal_commands::cmd_show_ospf_database_link
+        }
         "cmd_show_ospf_route" => internal_commands::cmd_show_ospf_route,
         "cmd_show_ospf_hostnames" => internal_commands::cmd_show_ospf_hostnames,
         "cmd_show_rip_interface" => internal_commands::cmd_show_rip_interface,
