@@ -19,11 +19,15 @@
       <token name="state" help="Show operational state." cmd="cmd_show_state">
         <token name="xpath" help="XPath expression.">
   	  <token name="xpath" argument="xpath" kind="string" help="XPath expression." cmd="cmd_show_state">
-            <token name="format" help="Configuration format.">
+            <token name="format" help="Data format.">
               <token name="json" argument="format" help="JSON output format." cmd="cmd_show_state"/>
 	      <token name="xml" argument="format" help="XML output format." cmd="cmd_show_state"/>
             </token>
           </token>
+        </token>
+        <token name="format" help="Data format.">
+          <token name="json" argument="format" help="JSON output format." cmd="cmd_show_state"/>
+          <token name="xml" argument="format" help="XML output format." cmd="cmd_show_state"/>
         </token>
       </token>
       <token name="yang" help="YANG information.">
