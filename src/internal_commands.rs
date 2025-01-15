@@ -761,7 +761,7 @@ pub(crate) fn cmd_show_isis_adjacency(
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
     let hostnames = isis_hostnames(session)?;
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_ISIS))
         .column_leaf("Instance", "name")
@@ -791,7 +791,7 @@ pub(crate) fn cmd_show_isis_database(
     _args: ParsedArgs,
 ) -> Result<bool, String> {
     let hostnames = isis_hostnames(session)?;
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_ISIS))
         .column_leaf("Instance", "name")
@@ -822,7 +822,7 @@ pub(crate) fn cmd_show_isis_route(
     session: &mut Session,
     _args: ParsedArgs,
 ) -> Result<bool, String> {
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_ISIS))
         .column_leaf("Instance", "name")
@@ -1144,7 +1144,7 @@ pub(crate) fn cmd_show_ospf_database_as(
         _ => unreachable!(),
     };
     let hostnames = ospf_hostnames(session, protocol)?;
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1187,7 +1187,7 @@ pub(crate) fn cmd_show_ospf_database_area(
         _ => unreachable!(),
     };
     let hostnames = ospf_hostnames(session, protocol)?;
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1232,7 +1232,7 @@ pub(crate) fn cmd_show_ospf_database_link(
         _ => unreachable!(),
     };
     let hostnames = ospf_hostnames(session, protocol)?;
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1367,7 +1367,7 @@ pub(crate) fn cmd_show_rip_interface(
         "ripng" => PROTOCOL_RIPNG,
         _ => unreachable!(),
     };
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1409,7 +1409,7 @@ pub(crate) fn cmd_show_rip_interface_detail(
         xpath_iface = format!("{}[interface='{}']", xpath_iface, name);
     }
 
-    let data = fetch_data(session, DataType::All, xpath_req)?;
+    let data = fetch_data(session, DataType::State, xpath_req)?;
 
     // Iterate over RIP instances.
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
@@ -1466,7 +1466,7 @@ pub(crate) fn cmd_show_rip_neighbor(
 
     let xpath_rip_neighbor = format!("ietf-rip:rip/{}/neighbors/neighbor", afi);
 
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1509,7 +1509,7 @@ pub(crate) fn cmd_show_rip_neighbor_detail(
             format!("{}[{}='{}']", xpath_neighbor, address, nb_address);
     }
 
-    let data = fetch_data(session, DataType::All, xpath_req)?;
+    let data = fetch_data(session, DataType::State, xpath_req)?;
 
     // Iterate over RIP instances.
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
@@ -1556,7 +1556,7 @@ pub(crate) fn cmd_show_rip_route(
 
     let xpath_rip_rib = format!("ietf-rip:rip/{}/routes/route", afi);
 
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1599,7 +1599,7 @@ pub(crate) fn cmd_show_mpls_ldp_interface(
         _ => unreachable!(),
     };
 
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1645,7 +1645,7 @@ pub(crate) fn cmd_show_mpls_ldp_interface_detail(
         xpath_iface = format!("{}[name='{}']", xpath_iface, name);
     }
 
-    let data = fetch_data(session, DataType::All, xpath_req)?;
+    let data = fetch_data(session, DataType::State, xpath_req)?;
 
     // Iterate over MPLS LDP instances.
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
@@ -1722,7 +1722,7 @@ pub(crate) fn cmd_show_mpls_ldp_peer(
         _ => unreachable!(),
     };
 
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1769,7 +1769,7 @@ pub(crate) fn cmd_show_mpls_ldp_peer_detail(
         xpath_peer = format!("{}[name='{}']", xpath_peer, name);
     }
 
-    let data = fetch_data(session, DataType::All, xpath_req)?;
+    let data = fetch_data(session, DataType::State, xpath_req)?;
 
     // Iterate over MPLS LDP instances.
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
@@ -1907,7 +1907,7 @@ pub(crate) fn cmd_show_mpls_ldp_binding_address(
         _ => unreachable!(),
     };
 
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1946,7 +1946,7 @@ pub(crate) fn cmd_show_mpls_ldp_binding_fec(
         _ => unreachable!(),
     };
 
-    YangTableBuilder::new(session, DataType::All)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
