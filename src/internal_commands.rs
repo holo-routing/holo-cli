@@ -1312,10 +1312,10 @@ pub(crate) fn cmd_show_ospf_hostnames(
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
         .xpath(XPATH_OSPF_HOSTNAMES)
-        .filter_list_key("prefix", get_opt_arg(&mut args, "router-id"))
         .column_leaf("Router ID", "router-id")
         .column_leaf("Hostname", "hostname")
         .show()?;
+
     Ok(false)
 }
 
