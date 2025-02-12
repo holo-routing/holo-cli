@@ -270,25 +270,35 @@ unsafe extern "C" fn ly_module_import_cb(
         submodule_revision: submodule_revision.clone().unwrap_or_default(),
         format: proto::SchemaFormat::Yang.into(),
     }) {
-        // Cache the module in the filesystem.
         let data = response.into_inner().data;
-        let path = match (module_revision, submodule_name, submodule_revision) {
-            (None, None, _) => build_cache_path(&module_name, None),
-            (Some(module_revision), None, _) => {
-                build_cache_path(&module_name, Some(&module_revision))
+
+        // Cache the module in the filesystem.
+        //
+        // Exclude Holo augmentation and deviation modules from caching, as they
+        // may change without corresponding version updates.
+        if !module_name.starts_with("holo") {
+            let path =
+                match (module_revision, submodule_name, submodule_revision) {
+                    (None, None, _) => build_cache_path(&module_name, None),
+                    (Some(module_revision), None, _) => {
+                        build_cache_path(&module_name, Some(&module_revision))
+                    }
+                    (_, Some(submodule_name), None) => {
+                        build_cache_path(&submodule_name, None)
+                    }
+                    (_, Some(submodule_name), Some(submodule_revision)) => {
+                        build_cache_path(
+                            &submodule_name,
+                            Some(&submodule_revision),
+                        )
+                    }
+                };
+            if let Err(error) = std::fs::write(&path, &data) {
+                eprintln!(
+                    "Failed to save YANG module in the cache ({}): {}",
+                    module_name, error
+                );
             }
-            (_, Some(submodule_name), None) => {
-                build_cache_path(&submodule_name, None)
-            }
-            (_, Some(submodule_name), Some(submodule_revision)) => {
-                build_cache_path(&submodule_name, Some(&submodule_revision))
-            }
-        };
-        if let Err(error) = std::fs::write(&path, &data) {
-            eprintln!(
-                "Failed to save YANG module in the cache ({}): {}",
-                module_name, error
-            );
         }
 
         // Return the retrieved module or submodule.
