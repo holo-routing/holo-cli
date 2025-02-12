@@ -1589,33 +1589,28 @@ const XPATH_MPLS_LDP_BINDING_FEC: &str =
     "ietf-mpls-ldp:mpls-ldp/global/address-families/ipv4/bindings/fec-label";
 const XPATH_MPLS_LDP_BINDING_FEC_PEER: &str = "peer";
 
-pub(crate) fn cmd_show_mpls_ldp_interface(
+pub(crate) fn cmd_show_mpls_ldp_discovery(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
-    let protocol = match get_arg(&mut args, "protocol").as_str() {
-        "mpls-ldp" => PROTOCOL_MPLS_LDP,
-        _ => unreachable!(),
-    };
-
     YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
-        .filter_list_key("type", Some(protocol))
+        .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
         .column_leaf("Instance", "name")
         .xpath(XPATH_MPLS_LDP_INTERFACE)
         .filter_list_key("name", get_opt_arg(&mut args, "name"))
         .column_leaf("Name", "name")
         .xpath(XPATH_MPLS_LDP_ADJACENCY)
-        .column_leaf("Adjacent address", "adjacent-address")
+        .column_leaf("Adjacent Address", "adjacent-address")
         .xpath(XPATH_MPLS_LDP_ADJACENCY_PEER)
-        .column_leaf("Neighbor lsr-id", "lsr-id")
+        .column_leaf("LSR Id", "lsr-id")
         .show()?;
 
     Ok(false)
 }
 
-pub(crate) fn cmd_show_mpls_ldp_interface_detail(
+pub(crate) fn cmd_show_mpls_ldp_discovery_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1623,27 +1618,22 @@ pub(crate) fn cmd_show_mpls_ldp_interface_detail(
     let mut output = String::new();
 
     // Parse arguments.
-    let protocol = match get_arg(&mut args, "protocol").as_str() {
-        "mpls-ldp" => PROTOCOL_MPLS_LDP,
-        _ => unreachable!(),
-    };
     let name = get_opt_arg(&mut args, "name");
 
     // Fetch data.
     let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
-        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", PROTOCOL_MPLS_LDP
     );
 
     let mut xpath_iface =
         "ietf-mpls-ldp:mpls-ldp/discovery/interfaces/interface".to_owned();
-
-    // when find_xpath is invoked current node is address-families
-    let xpath_adjacency = "ipv4/hello-adjacencies/hello-adjacency".to_owned();
-
     if let Some(name) = &name {
         xpath_iface = format!("{}[name='{}']", xpath_iface, name);
     }
+
+    // when find_xpath is invoked current node is address-families
+    let xpath_adjacency = "ipv4/hello-adjacencies/hello-adjacency".to_owned();
 
     let data = fetch_data(session, DataType::State, xpath_req)?;
 
@@ -1717,17 +1707,12 @@ pub(crate) fn cmd_show_mpls_ldp_peer(
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
-    let protocol = match get_arg(&mut args, "protocol").as_str() {
-        "mpls-ldp" => PROTOCOL_MPLS_LDP,
-        _ => unreachable!(),
-    };
-
     YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
-        .filter_list_key("type", Some(protocol))
+        .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
         .column_leaf("Instance", "name")
         .xpath(XPATH_MPLS_LDP_PEER)
-        .filter_list_key("lsr-id", get_opt_arg(&mut args, "peer"))
+        .filter_list_key("lsr-id", get_opt_arg(&mut args, "lsr-id"))
         .column_leaf("Peer", "lsr-id")
         .column_leaf("State", "session-state")
         .column_leaf("Uptime", "up-time")
@@ -1747,27 +1732,22 @@ pub(crate) fn cmd_show_mpls_ldp_peer_detail(
     let mut output = String::new();
 
     // Parse arguments.
-    let protocol = match get_arg(&mut args, "protocol").as_str() {
-        "mpls-ldp" => PROTOCOL_MPLS_LDP,
-        _ => unreachable!(),
-    };
-    let name = get_opt_arg(&mut args, "name");
+    let lsr_id = get_opt_arg(&mut args, "lsr-id");
 
     // Fetch data.
     let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
-        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", PROTOCOL_MPLS_LDP
     );
 
     let mut xpath_peer = "ietf-mpls-ldp:mpls-ldp/peers/peer".to_owned();
+    if let Some(lsr_id) = &lsr_id {
+        xpath_peer = format!("{}[lsr-id='{}']", xpath_peer, lsr_id);
+    }
 
     let xpath_adjacency = "ipv4/hello-adjacencies/hello-adjacency".to_owned();
 
     let xpath_capability = "capability".to_owned();
-
-    if let Some(name) = &name {
-        xpath_peer = format!("{}[name='{}']", xpath_peer, name);
-    }
 
     let data = fetch_data(session, DataType::State, xpath_req)?;
 
@@ -1902,14 +1882,9 @@ pub(crate) fn cmd_show_mpls_ldp_binding_address(
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
-    let protocol = match get_arg(&mut args, "protocol").as_str() {
-        "mpls-ldp" => PROTOCOL_MPLS_LDP,
-        _ => unreachable!(),
-    };
-
     YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
-        .filter_list_key("type", Some(protocol))
+        .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
         .column_leaf("Instance", "name")
         .xpath(XPATH_MPLS_LDP_BINDING_ADDRESS)
         .filter_list_key("address", get_opt_arg(&mut args, "address"))
@@ -1941,14 +1916,9 @@ pub(crate) fn cmd_show_mpls_ldp_binding_fec(
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, String> {
-    let protocol = match get_arg(&mut args, "protocol").as_str() {
-        "mpls-ldp" => PROTOCOL_MPLS_LDP,
-        _ => unreachable!(),
-    };
-
     YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
-        .filter_list_key("type", Some(protocol))
+        .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
         .column_leaf("Instance", "name")
         .xpath(XPATH_MPLS_LDP_BINDING_FEC)
         .filter_list_key("fec", get_opt_arg(&mut args, "fec"))

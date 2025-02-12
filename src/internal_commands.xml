@@ -128,24 +128,24 @@
       </token>
       <!-- MPLS LDP show commands -->
       <token name="mpls-ldp" argument="protocol" help="MPLS LDP information">
-        <token name="interface" help="Interface information" cmd="cmd_show_mpls_ldp_interface">
-          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_mpls_ldp_interface_detail"/>
-          <token name="NAME" help="Interface name" argument="name" kind="string" cmd="cmd_show_mpls_ldp_interface">
-            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_mpls_ldp_interface_detail"/>
+        <token name="discovery" help="Discovery Hello Information" cmd="cmd_show_mpls_ldp_discovery">
+          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_mpls_ldp_discovery_detail"/>
+          <token name="NAME" help="Interface name" argument="name" kind="string" cmd="cmd_show_mpls_ldp_discovery">
+            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_mpls_ldp_discovery_detail"/>
           </token>
         </token>
-        <token name="peer" help="LDP peer information" cmd="cmd_show_mpls_ldp_peer">
-          <token name="detail" help="LDP peer detailed information" argument="detail" cmd="cmd_show_mpls_ldp_peer_detail"/>
-          <token name="peer" help="LDP peer lsr-id" argument="peer" kind="string" cmd="cmd_show_mpls_ldp_peer">
-            <token name="detail" help="LDP peer lsr-id detailed information" argument="detail" cmd="cmd_show_mpls_ldp_peer_detail"/>
+        <token name="peer" help="Peer information" cmd="cmd_show_mpls_ldp_peer">
+          <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_mpls_ldp_peer_detail"/>
+          <token name="peer" help="Peer LSR-Id" argument="lsr-id" kind="string" cmd="cmd_show_mpls_ldp_peer">
+            <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_mpls_ldp_peer_detail"/>
           </token>
         </token>
-        <token name="binding" help="LDP binding information">
-          <token name="address" help="LDP binding address" cmd="cmd_show_mpls_ldp_binding_address">
-            <token name="address" help="LDP binding ADDRESS information" argument="address" kind="string" cmd="cmd_show_mpls_ldp_binding_address"/>
+        <token name="binding" help="Binding information">
+          <token name="address" help="Address bindings" cmd="cmd_show_mpls_ldp_binding_address">
+            <token name="address" help="Address value" argument="address" kind="string" cmd="cmd_show_mpls_ldp_binding_address"/>
           </token>
-          <token name="fec" help="LDP binding fec" cmd="cmd_show_mpls_ldp_binding_fec">
-            <token name="fec" help="LDP binding FEC information" argument="fec" kind="string" cmd="cmd_show_mpls_ldp_binding_fec"/>
+          <token name="fec" help="FEC bindings" cmd="cmd_show_mpls_ldp_binding_fec">
+            <token name="fec" help="FEC value" argument="fec" kind="string" cmd="cmd_show_mpls_ldp_binding_fec"/>
           </token>
         </token>
       </token>

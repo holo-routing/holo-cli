@@ -115,11 +115,11 @@ fn parse_tag_token(
             internal_commands::cmd_show_rip_neighbor_detail
         }
         "cmd_show_rip_route" => internal_commands::cmd_show_rip_route,
-        "cmd_show_mpls_ldp_interface" => {
-            internal_commands::cmd_show_mpls_ldp_interface
+        "cmd_show_mpls_ldp_discovery" => {
+            internal_commands::cmd_show_mpls_ldp_discovery
         }
-        "cmd_show_mpls_ldp_interface_detail" => {
-            internal_commands::cmd_show_mpls_ldp_interface_detail
+        "cmd_show_mpls_ldp_discovery_detail" => {
+            internal_commands::cmd_show_mpls_ldp_discovery_detail
         }
         "cmd_show_mpls_ldp_peer" => internal_commands::cmd_show_mpls_ldp_peer,
         "cmd_show_mpls_ldp_peer_detail" => {
