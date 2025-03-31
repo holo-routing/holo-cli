@@ -27,6 +27,9 @@ tonic-build = "0.12"
 [lints.rust]
 rust_2018_idioms = "warn"
 
+[lints.clippy]
+result_large_err = "allow"
+
 [profile.release]
 lto = true		# Enable link-time optimization for improved runtime performance
 codegen-units = 1	# Set the number of codegen units to 1 to increase optimization opportunities
