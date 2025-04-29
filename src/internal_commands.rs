@@ -71,10 +71,10 @@ impl<'a> YangTableBuilder<'a> {
     where
         S: AsRef<str>,
     {
-        if let Some(value) = value {
-            if let Some((xpath, _)) = self.paths.last_mut() {
-                *xpath = format!("{}[{}='{}']", xpath, key, value.as_ref());
-            }
+        if let Some(value) = value
+            && let Some((xpath, _)) = self.paths.last_mut()
+        {
+            *xpath = format!("{}[{}='{}']", xpath, key, value.as_ref());
         }
         self
     }

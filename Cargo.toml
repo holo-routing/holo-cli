@@ -29,6 +29,7 @@ rust_2018_idioms = "warn"
 
 [lints.clippy]
 result_large_err = "allow"
+uninlined_format_args = "allow"
 
 [profile.release]
 lto = true		# Enable link-time optimization for improved runtime performance

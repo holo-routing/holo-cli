@@ -180,10 +180,10 @@ pub(crate) fn parse_command(
     let mut token_id_child = wd_token_id;
     for token_id in wd_token_id.ancestors(&commands.arena) {
         // Update CLI node when traversing a YANG list.
-        if let Some(token) = commands.get_opt_token(token_id) {
-            if token.node_update {
-                session.mode_config_exit();
-            }
+        if let Some(token) = commands.get_opt_token(token_id)
+            && token.node_update
+        {
+            session.mode_config_exit();
         }
         // Ignore list keys that can match on everything.
         match commands.get_opt_token(token_id_child) {
