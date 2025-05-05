@@ -19,7 +19,7 @@ prost = "0.13"
 similar = "2.0"
 tokio = { version = "1.0", features = ["full"] }
 tonic = { version = "0.12", features = ["tls"] }
-yang3 = { version = "0.13", features = ["bundled"] }
+yang3 = { version = "0.16", features = ["bundled"] }
 
 [build-dependencies]
 tonic-build = "0.12"
