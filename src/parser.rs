@@ -114,7 +114,7 @@ pub(crate) fn parse_command_try(
         // Check how many matching tokens were found and return an error if
         // necessary.
         let matching_token_id = match matching_tokens.len() {
-            0 => return Err(ParserError::NoMatch),
+            0 => return Err(ParserError::NoMatch(line.to_owned())),
             1 => matching_tokens[0],
             _ => {
                 // Try to find an exact match, otherwise return an ambiguity

@@ -17,7 +17,7 @@ pub enum Error {
 
 #[derive(Debug)]
 pub enum ParserError {
-    NoMatch,
+    NoMatch(String),
     Incomplete(NodeId),
     Ambiguous(Vec<NodeId>),
 }
@@ -51,7 +51,9 @@ impl std::error::Error for Error {}
 impl std::fmt::Display for ParserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ParserError::NoMatch => write!(f, "unknown command"),
+            ParserError::NoMatch(command) => {
+                write!(f, "unknown command: {}", command)
+            }
             ParserError::Incomplete(_) => write!(f, "incomplete command"),
             ParserError::Ambiguous(_) => write!(f, "ambiguous command"),
         }
