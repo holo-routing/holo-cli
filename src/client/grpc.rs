@@ -303,8 +303,10 @@ unsafe extern "C" fn ly_module_import_cb(
 
         // Return the retrieved module or submodule.
         let data = CString::new(data).unwrap();
-        *format = ffi::LYS_INFORMAT::LYS_IN_YANG;
-        *module_data = data.as_ptr();
+        unsafe {
+            *format = ffi::LYS_INFORMAT::LYS_IN_YANG;
+            *module_data = data.as_ptr();
+        }
         std::mem::forget(data);
         return ffi::LY_ERR::LY_SUCCESS;
     }

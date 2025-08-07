@@ -3,7 +3,7 @@ name = "holo-cli"
 version = "0.5.0"
 authors = ["Renato Westphal <renatowestphal@gmail.com>"]
 license = "MIT"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 indextree = "4.3"
