@@ -16,7 +16,7 @@ use crate::client::{Client, DataType, DataValue};
 use crate::error::Error;
 use crate::parser::ParsedArgs;
 use crate::token::Commands;
-use crate::{token_yang, YANG_CTX};
+use crate::{YANG_CTX, token_yang};
 
 static DEFAULT_HOSTNAME: &str = "holo";
 

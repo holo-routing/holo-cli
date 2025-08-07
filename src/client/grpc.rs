@@ -13,9 +13,9 @@ use yang3::data::{
 };
 use yang3::ffi;
 
+use crate::YANG_MODULES_DIR;
 use crate::client::{Client, DataType, DataValue};
 use crate::error::Error;
-use crate::YANG_MODULES_DIR;
 
 pub mod proto {
     tonic::include_proto!("holo");

@@ -11,9 +11,9 @@ use indextree::NodeId;
 use itertools::Itertools;
 use yang3::schema::{DataValueType, SchemaNode, SchemaNodeKind};
 
+use crate::YANG_CTX;
 use crate::parser::ParsedArgs;
 use crate::token::{Action, Commands, Token, TokenKind};
-use crate::YANG_CTX;
 
 pub(crate) fn gen_cmds(commands: &mut Commands) {
     // Iterate over top-level YANG nodes.

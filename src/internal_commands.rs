@@ -9,7 +9,7 @@ use std::fmt::Write;
 use std::process::{Child, Command, Stdio};
 
 use indextree::NodeId;
-use prettytable::{format, row, Table};
+use prettytable::{Table, format, row};
 use similar::TextDiff;
 use yang3::data::{
     Data, DataFormat, DataNodeRef, DataParserFlags, DataPrinterFlags, DataTree,
@@ -17,11 +17,11 @@ use yang3::data::{
 };
 use yang3::schema::SchemaNodeKind;
 
+use crate::YANG_CTX;
 use crate::client::{DataType, DataValue};
 use crate::parser::ParsedArgs;
 use crate::session::{CommandMode, ConfigurationType, Session};
 use crate::token::{Commands, TokenKind};
-use crate::YANG_CTX;
 
 const XPATH_PROTOCOL: &str =
     "/ietf-routing:routing/control-plane-protocols/control-plane-protocol";
@@ -941,7 +941,8 @@ pub(crate) fn cmd_show_ospf_interface_detail(
     // Fetch data.
     let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
-        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
+        protocol
     );
     let xpath_area = "ietf-ospf:ospf/areas/area";
     let mut xpath_iface = "interfaces/interface".to_owned();
@@ -1059,7 +1060,8 @@ pub(crate) fn cmd_show_ospf_neighbor_detail(
     // Fetch data.
     let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
-        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
+        protocol
     );
     let xpath_area = "ietf-ospf:ospf/areas/area";
     let xpath_iface = "interfaces/interface";
@@ -1399,7 +1401,8 @@ pub(crate) fn cmd_show_rip_interface_detail(
     // Fetch data.
     let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
-        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
+        protocol
     );
 
     let mut xpath_iface = "ietf-rip:rip/interfaces/interface".to_owned();
@@ -1499,7 +1502,8 @@ pub(crate) fn cmd_show_rip_neighbor_detail(
     // Fetch data.
     let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
-        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", protocol
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
+        protocol
     );
 
     let mut xpath_neighbor = format!("ietf-rip:rip/{}/neighbors/neighbor", afi);
@@ -1623,7 +1627,8 @@ pub(crate) fn cmd_show_mpls_ldp_discovery_detail(
     // Fetch data.
     let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
-        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", PROTOCOL_MPLS_LDP
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
+        PROTOCOL_MPLS_LDP
     );
 
     let mut xpath_iface =
@@ -1737,7 +1742,8 @@ pub(crate) fn cmd_show_mpls_ldp_peer_detail(
     // Fetch data.
     let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
-        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']", PROTOCOL_MPLS_LDP
+        "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
+        PROTOCOL_MPLS_LDP
     );
 
     let mut xpath_peer = "ietf-mpls-ldp:mpls-ldp/peers/peer".to_owned();

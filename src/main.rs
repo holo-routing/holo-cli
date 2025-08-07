@@ -20,8 +20,8 @@ use clap::{App, Arg};
 use reedline::Signal;
 use yang3::context::{Context, ContextFlags};
 
-use crate::client::grpc::GrpcClient;
 use crate::client::Client;
+use crate::client::grpc::GrpcClient;
 use crate::error::Error;
 use crate::session::{CommandMode, Session};
 use crate::terminal::CliPrompt;

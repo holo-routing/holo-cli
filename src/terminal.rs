@@ -16,10 +16,10 @@ use reedline::{
     Suggestion, Vi,
 };
 
+use crate::Cli;
 use crate::error::ParserError;
 use crate::parser::{self, ParsedCommand};
 use crate::token::{Commands, TokenKind};
-use crate::Cli;
 
 static DEFAULT_PROMPT_INDICATOR: &str = "# ";
 static DEFAULT_MULTILINE_INDICATOR: &str = "::: ";

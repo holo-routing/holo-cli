@@ -5,8 +5,8 @@
 //
 
 use indextree::NodeId;
-use xml::reader::XmlEvent;
 use xml::ParserConfig;
+use xml::reader::XmlEvent;
 
 use crate::internal_commands;
 use crate::token::{Action, Commands, Token, TokenKind};
