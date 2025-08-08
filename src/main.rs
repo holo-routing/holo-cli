@@ -158,11 +158,22 @@ fn main() {
         .get_matches();
 
     // Connect to the daemon.
-    let addr = matches
+    let raw_addr = matches
         .value_of("address")
-        .unwrap_or("http://[::1]:50051")
+        .unwrap_or("[::1]:50051") // no http:// in default
         .to_string();
+
+    // Prepend http:// if not already present
+    let addr = if raw_addr.starts_with("http://")
+        || raw_addr.starts_with("https://")
+    {
+        raw_addr
+    } else {
+        format!("http://{}", raw_addr)
+    };
+
     let grpc_addr: &'static str = Box::leak(addr.into_boxed_str());
+
     let mut client = match GrpcClient::connect(grpc_addr) {
         Ok(client) => client,
         Err(error) => {
