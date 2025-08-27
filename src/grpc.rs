@@ -14,11 +14,19 @@ use yang3::data::{
 use yang3::ffi;
 
 use crate::YANG_MODULES_DIR;
-use crate::client::{Client, DataType, DataValue};
 use crate::error::Error;
 
 pub mod proto {
     tonic::include_proto!("holo");
+    impl data_tree::Data {
+        pub(crate) fn as_bytes(&self) -> Option<&::prost::alloc::vec::Vec<u8>> {
+            if let data_tree::Data::DataBytes(b) = &self {
+                Some(b)
+            } else {
+                None
+            }
+        }
+    }
 }
 
 type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -36,49 +44,7 @@ pub struct GrpcClient {
 // ===== impl GrpcClient =====
 
 impl GrpcClient {
-    fn rpc_sync_capabilities(
-        &mut self,
-    ) -> Result<tonic::Response<proto::CapabilitiesResponse>, tonic::Status>
-    {
-        let request = tonic::Request::new(proto::CapabilitiesRequest {});
-        self.runtime.block_on(self.client.capabilities(request))
-    }
-
-    fn rpc_sync_get_schema(
-        &mut self,
-        request: proto::GetSchemaRequest,
-    ) -> Result<tonic::Response<proto::GetSchemaResponse>, tonic::Status> {
-        let request = tonic::Request::new(request);
-        self.runtime.block_on(self.client.get_schema(request))
-    }
-
-    fn rpc_sync_get(
-        &mut self,
-        request: proto::GetRequest,
-    ) -> Result<tonic::Response<proto::GetResponse>, tonic::Status> {
-        let request = tonic::Request::new(request);
-        self.runtime.block_on(self.client.get(request))
-    }
-
-    fn rpc_sync_commit(
-        &mut self,
-        request: proto::CommitRequest,
-    ) -> Result<tonic::Response<proto::CommitResponse>, tonic::Status> {
-        let request = tonic::Request::new(request);
-        self.runtime.block_on(self.client.commit(request))
-    }
-
-    fn rpc_sync_validate(
-        &mut self,
-        request: proto::ValidateRequest,
-    ) -> Result<tonic::Response<proto::ValidateResponse>, tonic::Status> {
-        let request = tonic::Request::new(request);
-        self.runtime.block_on(self.client.validate(request))
-    }
-}
-
-impl Client for GrpcClient {
-    fn connect(dest: &'static str) -> Result<Self, StdError> {
+    pub fn connect(dest: &'static str) -> Result<Self, StdError> {
         // Initialize tokio runtime.
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -94,7 +60,7 @@ impl Client for GrpcClient {
         Ok(GrpcClient { client, runtime })
     }
 
-    fn load_modules(
+    pub fn load_modules(
         &mut self,
         dest: &'static str,
         yang_ctx: &mut yang3::context::Context,
@@ -137,16 +103,16 @@ impl Client for GrpcClient {
         }
     }
 
-    fn get(
+    pub fn get(
         &mut self,
-        data_type: DataType,
+        data_type: proto::get_request::DataType,
         format: DataFormat,
         with_defaults: bool,
         xpath: Option<String>,
-    ) -> Result<DataValue, Error> {
+    ) -> Result<proto::data_tree::Data, Error> {
         let data = self
             .rpc_sync_get(proto::GetRequest {
-                r#type: proto::get_request::DataType::from(data_type) as i32,
+                r#type: data_type as i32,
                 encoding: proto::Encoding::from(format) as i32,
                 with_defaults,
                 path: xpath.unwrap_or_default(),
@@ -155,18 +121,10 @@ impl Client for GrpcClient {
             .into_inner()
             .data
             .unwrap();
-        let data = match data.data.unwrap() {
-            proto::data_tree::Data::DataString(string) => {
-                DataValue::String(string)
-            }
-            proto::data_tree::Data::DataBytes(bytes) => {
-                DataValue::Binary(bytes)
-            }
-        };
-        Ok(data)
+        Ok(data.data.unwrap())
     }
 
-    fn validate_candidate(
+    pub fn validate_candidate(
         &mut self,
         candidate: &DataTree<'static>,
     ) -> Result<(), Error> {
@@ -188,7 +146,7 @@ impl Client for GrpcClient {
         Ok(())
     }
 
-    fn commit_candidate(
+    pub fn commit_candidate(
         &mut self,
         running: &DataTree<'static>,
         candidate: &DataTree<'static>,
@@ -220,19 +178,49 @@ impl Client for GrpcClient {
 
         Ok(())
     }
+
+    fn rpc_sync_capabilities(
+        &mut self,
+    ) -> Result<tonic::Response<proto::CapabilitiesResponse>, tonic::Status>
+    {
+        let request = tonic::Request::new(proto::CapabilitiesRequest {});
+        self.runtime.block_on(self.client.capabilities(request))
+    }
+
+    fn rpc_sync_get_schema(
+        &mut self,
+        request: proto::GetSchemaRequest,
+    ) -> Result<tonic::Response<proto::GetSchemaResponse>, tonic::Status> {
+        let request = tonic::Request::new(request);
+        self.runtime.block_on(self.client.get_schema(request))
+    }
+
+    fn rpc_sync_get(
+        &mut self,
+        request: proto::GetRequest,
+    ) -> Result<tonic::Response<proto::GetResponse>, tonic::Status> {
+        let request = tonic::Request::new(request);
+        self.runtime.block_on(self.client.get(request))
+    }
+
+    fn rpc_sync_commit(
+        &mut self,
+        request: proto::CommitRequest,
+    ) -> Result<tonic::Response<proto::CommitResponse>, tonic::Status> {
+        let request = tonic::Request::new(request);
+        self.runtime.block_on(self.client.commit(request))
+    }
+
+    fn rpc_sync_validate(
+        &mut self,
+        request: proto::ValidateRequest,
+    ) -> Result<tonic::Response<proto::ValidateResponse>, tonic::Status> {
+        let request = tonic::Request::new(request);
+        self.runtime.block_on(self.client.validate(request))
+    }
 }
 
 // ===== From/TryFrom conversion methods =====
-
-impl From<DataType> for proto::get_request::DataType {
-    fn from(data_type: DataType) -> proto::get_request::DataType {
-        match data_type {
-            DataType::All => proto::get_request::DataType::All,
-            DataType::Config => proto::get_request::DataType::Config,
-            DataType::State => proto::get_request::DataType::State,
-        }
-    }
-}
 
 impl From<DataFormat> for proto::Encoding {
     fn from(format: DataFormat) -> proto::Encoding {

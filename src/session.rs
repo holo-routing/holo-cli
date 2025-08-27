@@ -12,8 +12,8 @@ use yang3::data::{
 };
 use yang3::schema::{SchemaNode, SchemaNodeKind};
 
-use crate::client::{Client, DataType, DataValue};
 use crate::error::Error;
+use crate::grpc::{GrpcClient, proto};
 use crate::parser::ParsedArgs;
 use crate::token::Commands;
 use crate::{YANG_CTX, token_yang};
@@ -28,7 +28,7 @@ pub struct Session {
     mode: CommandMode,
     running: DataTree<'static>,
     candidate: Option<DataTree<'static>>,
-    client: Box<dyn Client>,
+    grpc_client: GrpcClient,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, EnumAsInner)]
@@ -53,15 +53,20 @@ pub enum ConfigurationType {
 // ===== impl Session =====
 
 impl Session {
-    pub(crate) fn new(use_pager: bool, mut client: Box<dyn Client>) -> Session {
+    pub(crate) fn new(use_pager: bool, mut grpc_client: GrpcClient) -> Session {
         let yang_ctx = YANG_CTX.get().unwrap();
         let data_format = DataFormat::LYB;
-        let running = client
-            .get(DataType::Config, data_format, false, None)
+        let running = grpc_client
+            .get(
+                proto::get_request::DataType::Config,
+                data_format,
+                false,
+                None,
+            )
             .unwrap();
         let running = DataTree::parse_string(
             yang_ctx,
-            running.as_bytes(),
+            running.as_bytes().unwrap(),
             data_format,
             DataParserFlags::empty(),
             DataValidationFlags::PRESENT | DataValidationFlags::NO_STATE,
@@ -75,7 +80,7 @@ impl Session {
             mode: CommandMode::Operational,
             running,
             candidate: None,
-            client,
+            grpc_client,
         }
     }
 
@@ -244,7 +249,7 @@ impl Session {
         Session::validate_configuration_yang(candidate)?;
 
         // Request the device to do a full configuration validation.
-        self.client.validate_candidate(candidate)
+        self.grpc_client.validate_candidate(candidate)
     }
 
     pub(crate) fn candidate_commit(
@@ -258,7 +263,7 @@ impl Session {
 
         // Request the device to validate and commit the candidate
         // configuration.
-        self.client
+        self.grpc_client
             .commit_candidate(&self.running, candidate, comment)?;
 
         // Replace the running configuration with the candidate configuration.
@@ -290,12 +295,13 @@ impl Session {
 
     pub(crate) fn get(
         &mut self,
-        data_type: DataType,
+        data_type: proto::get_request::DataType,
         format: DataFormat,
         with_defaults: bool,
         xpath: Option<String>,
-    ) -> Result<DataValue, Error> {
-        self.client.get(data_type, format, with_defaults, xpath)
+    ) -> Result<proto::data_tree::Data, Error> {
+        self.grpc_client
+            .get(data_type, format, with_defaults, xpath)
     }
 }
 

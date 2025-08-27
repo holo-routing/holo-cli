@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: MIT
 //
 
-mod client;
 mod error;
+mod grpc;
 mod internal_commands;
 mod parser;
 mod session;
@@ -20,9 +20,8 @@ use clap::{App, Arg};
 use reedline::Signal;
 use yang3::context::{Context, ContextFlags};
 
-use crate::client::Client;
-use crate::client::grpc::GrpcClient;
 use crate::error::Error;
+use crate::grpc::GrpcClient;
 use crate::session::{CommandMode, Session};
 use crate::terminal::CliPrompt;
 use crate::token::{Action, Commands};
@@ -41,13 +40,13 @@ pub struct Cli {
 // ===== impl Cli =====
 
 impl Cli {
-    fn new(use_pager: bool, client: Box<dyn Client>) -> Cli {
+    fn new(use_pager: bool, grpc_client: GrpcClient) -> Cli {
         // Generate commands.
         let mut commands = Commands::new();
         commands.gen_cmds();
 
         // Create CLI session.
-        let session = Session::new(use_pager, client);
+        let session = Session::new(use_pager, grpc_client);
 
         Cli { commands, session }
     }
@@ -173,9 +172,8 @@ fn main() {
     };
 
     let grpc_addr: &'static str = Box::leak(addr.into_boxed_str());
-
-    let mut client = match GrpcClient::connect(grpc_addr) {
-        Ok(client) => client,
+    let mut grpc_client = match GrpcClient::connect(grpc_addr) {
+        Ok(grpc_client) => grpc_client,
         Err(error) => {
             eprintln!("Connection to holod failed: {}\n", error);
             eprintln!("Please ensure that holod is currently running.");
@@ -202,13 +200,13 @@ fn main() {
     yang_ctx.set_searchdir(YANG_MODULES_DIR).unwrap();
 
     // Load YANG modules.
-    client.load_modules(grpc_addr, &mut yang_ctx);
+    grpc_client.load_modules(grpc_addr, &mut yang_ctx);
     YANG_CTX.set(Arc::new(yang_ctx)).unwrap();
 
     // Initialize CLI master structure.
     let use_pager = matches.values_of("command").is_none()
         && !matches.is_present("no-pager");
-    let mut cli = Cli::new(use_pager, Box::new(client));
+    let mut cli = Cli::new(use_pager, grpc_client);
 
     // Read configuration file.
     if let Some(path) = matches.value_of("file") {
