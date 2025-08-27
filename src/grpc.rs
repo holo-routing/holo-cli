@@ -19,7 +19,7 @@ use crate::error::Error;
 pub mod proto {
     tonic::include_proto!("holo");
     impl data_tree::Data {
-        pub(crate) fn as_bytes(&self) -> Option<&::prost::alloc::vec::Vec<u8>> {
+        pub fn as_bytes(&self) -> Option<&::prost::alloc::vec::Vec<u8>> {
             if let data_tree::Data::DataBytes(b) = &self {
                 Some(b)
             } else {

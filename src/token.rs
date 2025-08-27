@@ -48,7 +48,7 @@ type Callback = fn(
 // ===== impl Commands =====
 
 impl Commands {
-    pub(crate) fn new() -> Commands {
+    pub fn new() -> Commands {
         let mut arena = Arena::new();
         let exec_root = arena.new_node(None);
         let config_dflt_internal = arena.new_node(None);
@@ -64,22 +64,22 @@ impl Commands {
         }
     }
 
-    pub(crate) fn gen_cmds(&mut self) {
+    pub fn gen_cmds(&mut self) {
         token_yang::gen_cmds(self);
         token_xml::gen_cmds(self);
     }
 
-    pub(crate) fn add_token(&mut self, parent: NodeId, token: Token) -> NodeId {
+    pub fn add_token(&mut self, parent: NodeId, token: Token) -> NodeId {
         let token_id = self.arena.new_node(Some(token));
         parent.append(token_id, &mut self.arena);
         token_id
     }
 
-    pub(crate) fn get_token(&self, token_id: NodeId) -> &Token {
+    pub fn get_token(&self, token_id: NodeId) -> &Token {
         self.get_opt_token(token_id).unwrap()
     }
 
-    pub(crate) fn get_opt_token(&self, token_id: NodeId) -> Option<&Token> {
+    pub fn get_opt_token(&self, token_id: NodeId) -> Option<&Token> {
         self.arena.get(token_id).unwrap().get().as_ref()
     }
 }
@@ -87,7 +87,7 @@ impl Commands {
 // ===== impl Token =====
 
 impl Token {
-    pub(crate) fn new<S: Into<String>>(
+    pub fn new<S: Into<String>>(
         name: S,
         help: Option<S>,
         kind: TokenKind,
@@ -105,7 +105,7 @@ impl Token {
         }
     }
 
-    pub(crate) fn matches(&self, word: &str, exact: bool) -> bool {
+    pub fn matches(&self, word: &str, exact: bool) -> bool {
         if self.kind == TokenKind::String {
             // TODO: custom match per token type.
             true

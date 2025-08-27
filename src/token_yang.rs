@@ -15,7 +15,7 @@ use crate::YANG_CTX;
 use crate::parser::ParsedArgs;
 use crate::token::{Action, Commands, Token, TokenKind};
 
-pub(crate) fn gen_cmds(commands: &mut Commands) {
+pub fn gen_cmds(commands: &mut Commands) {
     // Iterate over top-level YANG nodes.
     let yang_ctx = YANG_CTX.get().unwrap();
     for snode in yang_ctx
@@ -119,7 +119,7 @@ fn is_full_command(snode: &SchemaNode<'_>, is_argument: bool) -> bool {
     }
 }
 
-pub(crate) fn update_cli_path(
+pub fn update_cli_path(
     path: &mut String,
     snode: &SchemaNode<'_>,
     list_keys: &ParsedArgs,
@@ -140,7 +140,7 @@ fn snode_set_token_id(snode: &SchemaNode<'_>, token_id: NodeId) {
 }
 
 // Retrieve token ID from the schema node private pointer.
-pub(crate) fn snode_get_token_id(snode: &SchemaNode<'_>) -> NodeId {
+pub fn snode_get_token_id(snode: &SchemaNode<'_>) -> NodeId {
     let btoken_id_ptr = snode.get_private().unwrap() as *mut NodeId;
     let btoken_id = unsafe { Box::from_raw(btoken_id_ptr) };
     let token_id = *btoken_id;

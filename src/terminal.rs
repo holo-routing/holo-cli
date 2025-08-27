@@ -35,11 +35,11 @@ pub struct CliCompleter(Arc<Mutex<Cli>>);
 // ===== impl CliPrompt =====
 
 impl CliPrompt {
-    pub(crate) fn new(string: String) -> Self {
+    pub fn new(string: String) -> Self {
         Self(string)
     }
 
-    pub(crate) fn update(&mut self, string: String) {
+    pub fn update(&mut self, string: String) {
         self.0 = string;
     }
 }
@@ -138,7 +138,7 @@ impl Completer for CliCompleter {
 
 // ===== global functions =====
 
-pub(crate) fn reedline_init(
+pub fn reedline_init(
     cli: Arc<Mutex<Cli>>,
     use_ansi_coloring: bool,
 ) -> Reedline {

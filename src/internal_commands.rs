@@ -359,7 +359,7 @@ impl DataNodeRefExt for DataNodeRef<'_> {
 
 // ===== "configure" =====
 
-pub(crate) fn cmd_config(
+pub fn cmd_config(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
@@ -371,7 +371,7 @@ pub(crate) fn cmd_config(
 
 // ===== "exit" =====
 
-pub(crate) fn cmd_exit_exec(
+pub fn cmd_exit_exec(
     _commands: &Commands,
     _session: &mut Session,
     _args: ParsedArgs,
@@ -380,7 +380,7 @@ pub(crate) fn cmd_exit_exec(
     Ok(true)
 }
 
-pub(crate) fn cmd_exit_config(
+pub fn cmd_exit_config(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
@@ -391,7 +391,7 @@ pub(crate) fn cmd_exit_config(
 
 // ===== "end" =====
 
-pub(crate) fn cmd_end(
+pub fn cmd_end(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
@@ -402,7 +402,7 @@ pub(crate) fn cmd_end(
 
 // ===== "list" =====
 
-pub(crate) fn cmd_list(
+pub fn cmd_list(
     commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
@@ -426,7 +426,7 @@ pub(crate) fn cmd_list(
     Ok(false)
 }
 
-pub(crate) fn cmd_list_root(commands: &Commands, top_token_id: &NodeId) {
+pub fn cmd_list_root(commands: &Commands, top_token_id: &NodeId) {
     for token_id in
         top_token_id
             .descendants(&commands.arena)
@@ -458,7 +458,7 @@ pub(crate) fn cmd_list_root(commands: &Commands, top_token_id: &NodeId) {
 
 // ===== "pwd" =====
 
-pub(crate) fn cmd_pwd(
+pub fn cmd_pwd(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
@@ -472,7 +472,7 @@ pub(crate) fn cmd_pwd(
 
 // ===== "discard" =====
 
-pub(crate) fn cmd_discard(
+pub fn cmd_discard(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
@@ -483,7 +483,7 @@ pub(crate) fn cmd_discard(
 
 // ===== "commit" =====
 
-pub(crate) fn cmd_commit(
+pub fn cmd_commit(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -503,7 +503,7 @@ pub(crate) fn cmd_commit(
 
 // ===== "validate" =====
 
-pub(crate) fn cmd_validate(
+pub fn cmd_validate(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
@@ -604,7 +604,7 @@ fn cmd_show_config_yang(
     Ok(data)
 }
 
-pub(crate) fn cmd_show_config(
+pub fn cmd_show_config(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -640,7 +640,7 @@ pub(crate) fn cmd_show_config(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_config_changes(
+pub fn cmd_show_config_changes(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
@@ -663,7 +663,7 @@ pub(crate) fn cmd_show_config_changes(
 
 // ===== "show state" =====
 
-pub(crate) fn cmd_show_state(
+pub fn cmd_show_state(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -693,7 +693,7 @@ pub(crate) fn cmd_show_state(
 
 // ===== "show yang modules" =====
 
-pub(crate) fn cmd_show_yang_modules(
+pub fn cmd_show_yang_modules(
     _commands: &Commands,
     _session: &mut Session,
     _args: ParsedArgs,
@@ -739,7 +739,7 @@ const XPATH_ISIS_LSP: &str = "lsp";
 const XPATH_ISIS_ROUTE: &str = "ietf-isis:isis/local-rib/route";
 const XPATH_ISIS_NEXTHOP: &str = "next-hops/next-hop";
 
-pub(crate) fn cmd_show_isis_interface(
+pub fn cmd_show_isis_interface(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -759,7 +759,7 @@ pub(crate) fn cmd_show_isis_interface(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_isis_adjacency(
+pub fn cmd_show_isis_adjacency(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -789,7 +789,7 @@ pub(crate) fn cmd_show_isis_adjacency(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_isis_database(
+pub fn cmd_show_isis_database(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
@@ -821,7 +821,7 @@ pub(crate) fn cmd_show_isis_database(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_isis_route(
+pub fn cmd_show_isis_route(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
@@ -889,7 +889,7 @@ const XPATH_OSPF_NEXTHOP: &str = "next-hops/next-hop";
 const XPATH_OSPF_HOSTNAMES: &str =
     "ietf-ospf:ospf/holo-ospf:hostnames/hostname";
 
-pub(crate) fn cmd_show_ospf_interface(
+pub fn cmd_show_ospf_interface(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -928,7 +928,7 @@ pub(crate) fn cmd_show_ospf_interface(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospf_interface_detail(
+pub fn cmd_show_ospf_interface_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1002,7 +1002,7 @@ pub(crate) fn cmd_show_ospf_interface_detail(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospf_neighbor(
+pub fn cmd_show_ospf_neighbor(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1048,7 +1048,7 @@ pub(crate) fn cmd_show_ospf_neighbor(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospf_neighbor_detail(
+pub fn cmd_show_ospf_neighbor_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1142,7 +1142,7 @@ pub(crate) fn cmd_show_ospf_neighbor_detail(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospf_database_as(
+pub fn cmd_show_ospf_database_as(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1185,7 +1185,7 @@ pub(crate) fn cmd_show_ospf_database_as(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospf_database_area(
+pub fn cmd_show_ospf_database_area(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1230,7 +1230,7 @@ pub(crate) fn cmd_show_ospf_database_area(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospf_database_link(
+pub fn cmd_show_ospf_database_link(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1277,7 +1277,7 @@ pub(crate) fn cmd_show_ospf_database_link(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospf_route(
+pub fn cmd_show_ospf_route(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1305,7 +1305,7 @@ pub(crate) fn cmd_show_ospf_route(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_ospf_hostnames(
+pub fn cmd_show_ospf_hostnames(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1366,7 +1366,7 @@ const XPATH_RIP_INTERFACE: &str = "ietf-rip:rip/interfaces/interface";
 const AFI4: &str = "ipv4";
 const AFI6: &str = "ipv6";
 
-pub(crate) fn cmd_show_rip_interface(
+pub fn cmd_show_rip_interface(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1390,7 +1390,7 @@ pub(crate) fn cmd_show_rip_interface(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_rip_interface_detail(
+pub fn cmd_show_rip_interface_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1463,7 +1463,7 @@ pub(crate) fn cmd_show_rip_interface_detail(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_rip_neighbor(
+pub fn cmd_show_rip_neighbor(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1491,7 +1491,7 @@ pub(crate) fn cmd_show_rip_neighbor(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_rip_neighbor_detail(
+pub fn cmd_show_rip_neighbor_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1555,7 +1555,7 @@ pub(crate) fn cmd_show_rip_neighbor_detail(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_rip_route(
+pub fn cmd_show_rip_route(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1603,7 +1603,7 @@ const XPATH_MPLS_LDP_BINDING_FEC: &str =
     "ietf-mpls-ldp:mpls-ldp/global/address-families/ipv4/bindings/fec-label";
 const XPATH_MPLS_LDP_BINDING_FEC_PEER: &str = "peer";
 
-pub(crate) fn cmd_show_mpls_ldp_discovery(
+pub fn cmd_show_mpls_ldp_discovery(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1624,7 +1624,7 @@ pub(crate) fn cmd_show_mpls_ldp_discovery(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_mpls_ldp_discovery_detail(
+pub fn cmd_show_mpls_ldp_discovery_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1718,7 +1718,7 @@ pub(crate) fn cmd_show_mpls_ldp_discovery_detail(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_mpls_ldp_peer(
+pub fn cmd_show_mpls_ldp_peer(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1740,7 +1740,7 @@ pub(crate) fn cmd_show_mpls_ldp_peer(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_mpls_ldp_peer_detail(
+pub fn cmd_show_mpls_ldp_peer_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1895,7 +1895,7 @@ pub(crate) fn cmd_show_mpls_ldp_peer_detail(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_mpls_ldp_binding_address(
+pub fn cmd_show_mpls_ldp_binding_address(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
@@ -1929,7 +1929,7 @@ pub(crate) fn cmd_show_mpls_ldp_binding_address(
     Ok(false)
 }
 
-pub(crate) fn cmd_show_mpls_ldp_binding_fec(
+pub fn cmd_show_mpls_ldp_binding_fec(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,

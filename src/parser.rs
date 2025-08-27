@@ -24,7 +24,7 @@ pub type ParsedArgs = VecDeque<(String, String)>;
 
 // ===== global functions =====
 
-pub(crate) fn normalize_input_line(line: &str) -> Option<String> {
+pub fn normalize_input_line(line: &str) -> Option<String> {
     // Ignore "!" comments.
     // TODO: allow "!" within user input like interface descriptions
     let line = line.split('!').next()?;
@@ -90,7 +90,7 @@ fn find_exact_matching_token<'a>(
     })
 }
 
-pub(crate) fn parse_command_try(
+pub fn parse_command_try(
     session: &Session,
     commands: &Commands,
     start_token_id: NodeId,
@@ -163,7 +163,7 @@ pub(crate) fn parse_command_try(
     }
 }
 
-pub(crate) fn parse_command(
+pub fn parse_command(
     session: &mut Session,
     commands: &Commands,
     line: &str,

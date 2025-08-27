@@ -53,7 +53,7 @@ pub enum ConfigurationType {
 // ===== impl Session =====
 
 impl Session {
-    pub(crate) fn new(use_pager: bool, mut grpc_client: GrpcClient) -> Session {
+    pub fn new(use_pager: bool, mut grpc_client: GrpcClient) -> Session {
         let yang_ctx = YANG_CTX.get().unwrap();
         let data_format = DataFormat::LYB;
         let running = grpc_client
@@ -84,7 +84,7 @@ impl Session {
         }
     }
 
-    pub(crate) fn update_hostname(&mut self) {
+    pub fn update_hostname(&mut self) {
         self.hostname = self
             .running
             .find_path("/ietf-system:system/ietf-system:hostname")
@@ -94,11 +94,11 @@ impl Session {
         self.update_prompt();
     }
 
-    pub(crate) fn prompt(&self) -> String {
+    pub fn prompt(&self) -> String {
         self.prompt.clone()
     }
 
-    pub(crate) fn use_pager(&self) -> bool {
+    pub fn use_pager(&self) -> bool {
         self.use_pager
     }
 
@@ -115,11 +115,11 @@ impl Session {
         }
     }
 
-    pub(crate) fn mode(&self) -> &CommandMode {
+    pub fn mode(&self) -> &CommandMode {
         &self.mode
     }
 
-    pub(crate) fn mode_set(&mut self, mode: CommandMode) {
+    pub fn mode_set(&mut self, mode: CommandMode) {
         if self.mode == mode {
             return;
         }
@@ -141,7 +141,7 @@ impl Session {
         self.update_prompt();
     }
 
-    pub(crate) fn mode_config_exit(&mut self) {
+    pub fn mode_config_exit(&mut self) {
         let nodes = self.mode.as_configure_mut().unwrap();
         if nodes.pop().is_none() {
             self.mode = CommandMode::Operational
@@ -149,7 +149,7 @@ impl Session {
         self.update_prompt();
     }
 
-    pub(crate) fn edit_candidate(
+    pub fn edit_candidate(
         &mut self,
         negate: bool,
         snode: &SchemaNode<'_>,
@@ -238,11 +238,11 @@ impl Session {
         Ok(())
     }
 
-    pub(crate) fn candidate_discard(&mut self) {
+    pub fn candidate_discard(&mut self) {
         self.candidate = Some(self.running.duplicate().unwrap());
     }
 
-    pub(crate) fn candidate_validate(&mut self) -> Result<(), Error> {
+    pub fn candidate_validate(&mut self) -> Result<(), Error> {
         let candidate = self.candidate.as_mut().unwrap();
 
         // Validate the candidate configuration against YANG schema first.
@@ -252,7 +252,7 @@ impl Session {
         self.grpc_client.validate_candidate(candidate)
     }
 
-    pub(crate) fn candidate_commit(
+    pub fn candidate_commit(
         &mut self,
         comment: Option<String>,
     ) -> Result<(), Error> {
@@ -283,7 +283,7 @@ impl Session {
             .map_err(Error::ValidateConfig)
     }
 
-    pub(crate) fn get_configuration(
+    pub fn get_configuration(
         &mut self,
         config_type: ConfigurationType,
     ) -> &DataTree<'static> {
@@ -293,7 +293,7 @@ impl Session {
         }
     }
 
-    pub(crate) fn get(
+    pub fn get(
         &mut self,
         data_type: proto::get_request::DataType,
         format: DataFormat,
@@ -308,7 +308,7 @@ impl Session {
 // ===== impl CommandMode =====
 
 impl CommandMode {
-    pub(crate) fn token(&self, commands: &Commands) -> NodeId {
+    pub fn token(&self, commands: &Commands) -> NodeId {
         match self {
             CommandMode::Operational => commands.exec_root,
             CommandMode::Configure { nodes } => match nodes.last() {
@@ -318,7 +318,7 @@ impl CommandMode {
         }
     }
 
-    pub(crate) fn cli_path(&self) -> Option<String> {
+    pub fn cli_path(&self) -> Option<String> {
         match self {
             CommandMode::Operational => None,
             CommandMode::Configure { nodes } => {
@@ -327,7 +327,7 @@ impl CommandMode {
         }
     }
 
-    pub(crate) fn data_path(&self) -> Option<String> {
+    pub fn data_path(&self) -> Option<String> {
         match self {
             CommandMode::Operational => None,
             CommandMode::Configure { nodes } => {

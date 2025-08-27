@@ -11,7 +11,7 @@ use xml::reader::XmlEvent;
 use crate::internal_commands;
 use crate::token::{Action, Commands, Token, TokenKind};
 
-pub(crate) fn gen_cmds(commands: &mut Commands) {
+pub fn gen_cmds(commands: &mut Commands) {
     // Read embedded XML file containing command definitions.
     let xml = include_str!("internal_commands.xml");
     let reader = ParserConfig::new().create_reader(xml.as_bytes());
