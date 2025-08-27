@@ -18,15 +18,6 @@ use crate::error::Error;
 
 pub mod proto {
     tonic::include_proto!("holo");
-    impl data_tree::Data {
-        pub fn as_bytes(&self) -> Option<&::prost::alloc::vec::Vec<u8>> {
-            if let data_tree::Data::DataBytes(b) = &self {
-                Some(b)
-            } else {
-                None
-            }
-        }
-    }
 }
 
 type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -128,20 +119,11 @@ impl GrpcClient {
         &mut self,
         candidate: &DataTree<'static>,
     ) -> Result<(), Error> {
-        let config = {
-            let encoding = proto::Encoding::Lyb as i32;
-            let bytes = candidate
-                .print_bytes(DataFormat::LYB, DataPrinterFlags::WITH_SIBLINGS)
-                .expect("Failed to encode data tree");
-
-            Some(proto::DataTree {
-                encoding,
-                data: Some(proto::data_tree::Data::DataBytes(bytes)),
-            })
-        };
-
-        self.rpc_sync_validate(proto::ValidateRequest { config })
-            .map_err(Error::Backend)?;
+        let config = proto::DataTree::new(DataFormat::LYB, candidate);
+        self.rpc_sync_validate(proto::ValidateRequest {
+            config: Some(config),
+        })
+        .map_err(Error::Backend)?;
 
         Ok(())
     }
@@ -153,30 +135,34 @@ impl GrpcClient {
         comment: Option<String>,
     ) -> Result<(), Error> {
         let operation = proto::commit_request::Operation::Change as i32;
-        let config = {
-            let encoding = proto::Encoding::Lyb as i32;
-            let diff = running
-                .diff(candidate, DataDiffFlags::DEFAULTS)
-                .expect("Failed to compare configurations");
-            let bytes = diff
-                .print_bytes(DataFormat::LYB, DataPrinterFlags::WITH_SIBLINGS)
-                .expect("Failed to encode data diff");
-
-            Some(proto::DataTree {
-                encoding,
-                data: Some(proto::data_tree::Data::DataBytes(bytes)),
-            })
-        };
-
+        let diff = running
+            .diff(candidate, DataDiffFlags::DEFAULTS)
+            .expect("Failed to compare configurations");
+        let config = proto::DataTree::new(DataFormat::LYB, &diff);
         self.rpc_sync_commit(proto::CommitRequest {
             operation,
-            config,
+            config: Some(config),
             comment: comment.unwrap_or_default(),
             confirmed_timeout: 0,
         })
         .map_err(Error::Backend)?;
 
         Ok(())
+    }
+
+    pub fn execute(
+        &mut self,
+        data: DataTree<'static>,
+    ) -> Result<proto::data_tree::Data, Error> {
+        let data = self
+            .rpc_sync_execute(proto::ExecuteRequest {
+                data: Some(proto::DataTree::new(DataFormat::LYB, &data)),
+            })
+            .map_err(Error::Backend)?
+            .into_inner()
+            .data
+            .unwrap();
+        Ok(data.data.unwrap())
     }
 
     fn rpc_sync_capabilities(
@@ -217,6 +203,52 @@ impl GrpcClient {
     ) -> Result<tonic::Response<proto::ValidateResponse>, tonic::Status> {
         let request = tonic::Request::new(request);
         self.runtime.block_on(self.client.validate(request))
+    }
+
+    fn rpc_sync_execute(
+        &mut self,
+        request: proto::ExecuteRequest,
+    ) -> Result<tonic::Response<proto::ExecuteResponse>, tonic::Status> {
+        let request = tonic::Request::new(request);
+        self.runtime.block_on(self.client.execute(request))
+    }
+}
+
+// ===== impl proto::data_tree::Data =====
+
+impl proto::data_tree::Data {
+    pub fn as_bytes(&self) -> Option<&::prost::alloc::vec::Vec<u8>> {
+        if let proto::data_tree::Data::DataBytes(b) = &self {
+            Some(b)
+        } else {
+            None
+        }
+    }
+}
+
+// ===== impl proto::DataTree =====
+
+impl proto::DataTree {
+    fn new<'a>(format: DataFormat, data: &impl Data<'a>) -> Self {
+        let encoding = proto::Encoding::from(format) as i32;
+        let data = match format {
+            DataFormat::JSON | DataFormat::XML => {
+                let string = data
+                    .print_string(format, DataPrinterFlags::WITH_SIBLINGS)
+                    .expect("Failed to encode data tree");
+                proto::data_tree::Data::DataString(string)
+            }
+            DataFormat::LYB => {
+                let bytes = data
+                    .print_bytes(format, DataPrinterFlags::WITH_SIBLINGS)
+                    .expect("Failed to encode data tree");
+                proto::data_tree::Data::DataBytes(bytes)
+            }
+        };
+        proto::DataTree {
+            encoding,
+            data: Some(data),
+        }
     }
 }
 

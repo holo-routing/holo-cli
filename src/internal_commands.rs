@@ -12,8 +12,8 @@ use indextree::NodeId;
 use prettytable::{Table, format, row};
 use similar::TextDiff;
 use yang3::data::{
-    Data, DataFormat, DataNodeRef, DataParserFlags, DataPrinterFlags, DataTree,
-    DataValidationFlags,
+    Data, DataFormat, DataNodeRef, DataOperation, DataParserFlags,
+    DataPrinterFlags, DataTree, DataValidationFlags,
 };
 use yang3::schema::SchemaNodeKind;
 
@@ -1969,6 +1969,29 @@ pub fn cmd_show_mpls_ldp_binding_fec(
         )
         .column_leaf("In use", "used-in-forwarding")
         .show()?;
+
+    Ok(false)
+}
+
+// ===== IS-IS "clear" commands =====
+
+pub fn cmd_clear_isis_adjacency(
+    _commands: &Commands,
+    session: &mut Session,
+    _args: ParsedArgs,
+) -> Result<bool, String> {
+    let yang_ctx = YANG_CTX.get().unwrap();
+    let data = r#"{"ietf-isis:clear-adjacency": {}}"#;
+    let data = DataTree::parse_op_string(
+        yang_ctx,
+        data,
+        DataFormat::JSON,
+        DataOperation::RpcYang,
+    )
+    .expect("Failed to parse data tree");
+    let _ = session
+        .execute(data)
+        .map_err(|error| format!("% failed to invoke RPC: {}", error))?;
 
     Ok(false)
 }

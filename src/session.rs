@@ -303,6 +303,13 @@ impl Session {
         self.grpc_client
             .get(data_type, format, with_defaults, xpath)
     }
+
+    pub fn execute(
+        &mut self,
+        data: DataTree<'static>,
+    ) -> Result<proto::data_tree::Data, Error> {
+        self.grpc_client.execute(data)
+    }
 }
 
 // ===== impl CommandMode =====

@@ -131,6 +131,9 @@ fn parse_tag_token(
         "cmd_show_mpls_ldp_binding_fec" => {
             internal_commands::cmd_show_mpls_ldp_binding_fec
         }
+        "cmd_clear_isis_adjacency" => {
+            internal_commands::cmd_clear_isis_adjacency
+        }
         _ => panic!("unknown command name: {}", name),
     });
 
