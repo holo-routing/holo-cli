@@ -1995,3 +1995,24 @@ pub fn cmd_clear_isis_adjacency(
 
     Ok(false)
 }
+
+pub fn cmd_clear_isis_database(
+    _commands: &Commands,
+    session: &mut Session,
+    _args: ParsedArgs,
+) -> Result<bool, String> {
+    let yang_ctx = YANG_CTX.get().unwrap();
+    let data = r#"{"ietf-isis:clear-database": {}}"#;
+    let data = DataTree::parse_op_string(
+        yang_ctx,
+        data,
+        DataFormat::JSON,
+        DataOperation::RpcYang,
+    )
+    .expect("Failed to parse data tree");
+    let _ = session
+        .execute(data)
+        .map_err(|error| format!("% failed to invoke RPC: {}", error))?;
+
+    Ok(false)
+}

@@ -134,6 +134,7 @@ fn parse_tag_token(
         "cmd_clear_isis_adjacency" => {
             internal_commands::cmd_clear_isis_adjacency
         }
+        "cmd_clear_isis_database" => internal_commands::cmd_clear_isis_database,
         _ => panic!("unknown command name: {}", name),
     });
 

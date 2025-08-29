@@ -154,6 +154,7 @@
       <!-- IS-IS clear commands -->
       <token name="isis" argument="protocol" help="IS-IS routing protocol">
 	<token name="adjacency" help="IS-IS adjacencies" cmd="cmd_clear_isis_adjacency"/>
+	<token name="database" help="IS-IS database" cmd="cmd_clear_isis_database"/>
       </token>
     </token>
   </tree>
