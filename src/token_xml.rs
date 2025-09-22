@@ -91,6 +91,7 @@ fn parse_tag_token(
         "cmd_show_ospf_interface_detail" => {
             internal_commands::cmd_show_ospf_interface_detail
         }
+        "cmd_show_ospf_vlink" => internal_commands::cmd_show_ospf_vlink,
         "cmd_show_ospf_neighbor" => internal_commands::cmd_show_ospf_neighbor,
         "cmd_show_ospf_neighbor_detail" => {
             internal_commands::cmd_show_ospf_neighbor_detail

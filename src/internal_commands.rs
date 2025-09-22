@@ -883,6 +883,7 @@ const XPATH_OSPF_AREA_LSDB: &str =
 const XPATH_OSPF_INTERFACE: &str = "interfaces/interface";
 const XPATH_OSPF_INTERFACE_LSDB: &str =
     "database/link-scope-lsa-type/link-scope-lsas/link-scope-lsa/*/header";
+const XPATH_OSPF_VLINK: &str = "virtual-links/virtual-link";
 const XPATH_OSPF_NEIGHBOR: &str = "neighbors/neighbor";
 const XPATH_OSPF_RIB: &str = "ietf-ospf:ospf/local-rib/route";
 const XPATH_OSPF_NEXTHOP: &str = "next-hops/next-hop";
@@ -998,6 +999,47 @@ pub fn cmd_show_ospf_interface_detail(
     if let Err(error) = page_output(session, &output) {
         println!("% failed to print data: {}", error)
     }
+
+    Ok(false)
+}
+
+pub fn cmd_show_ospf_vlink(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, String> {
+    let protocol = match get_arg(&mut args, "protocol").as_str() {
+        "ospfv2" => PROTOCOL_OSPFV2,
+        "ospfv3" => PROTOCOL_OSPFV3,
+        _ => unreachable!(),
+    };
+    let hostnames = ospf_hostnames(session, protocol)?;
+    YangTableBuilder::new(session, proto::get_request::DataType::All)
+        .xpath(XPATH_PROTOCOL)
+        .filter_list_key("type", Some(protocol))
+        .column_leaf("Instance", "name")
+        .xpath(XPATH_OSPF_AREA)
+        .xpath(XPATH_OSPF_VLINK)
+        .column_leaf("Transit Area", "transit-area-id")
+        .xpath(XPATH_OSPF_NEIGHBOR)
+        .column_from_fn(
+            "Router ID",
+            Box::new(move |dnode| {
+                let router_id = dnode.child_value("neighbor-router-id");
+                hostnames.get(&router_id).cloned().unwrap_or(router_id)
+            }),
+        )
+        .column_leaf("Address", "address")
+        .column_leaf("State", "state")
+        .column_from_fn(
+            "Dead Interval (s)",
+            Box::new(|dnode| {
+                let interval = dnode.relative_value("../../dead-interval");
+                let remaining = dnode.child_value("dead-timer");
+                format!("{} ({})", interval, remaining)
+            }),
+        )
+        .show()?;
 
     Ok(false)
 }

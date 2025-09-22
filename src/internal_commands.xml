@@ -50,6 +50,7 @@
             <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_interface_detail"/>
           </token>
         </token>
+	<token name="virtual-link" help="Virtual link information" cmd="cmd_show_ospf_vlink"/>
         <token name="neighbor" help="Neighbor information" cmd="cmd_show_ospf_neighbor">
           <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_neighbor_detail"/>
           <token name="router_id" help="Neighbor Router ID" argument="router_id" kind="string" cmd="cmd_show_ospf_neighbor">
@@ -74,6 +75,7 @@
             <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_interface_detail"/>
           </token>
         </token>
+	<token name="virtual-link" help="Virtual link information" cmd="cmd_show_ospf_vlink"/>
         <token name="neighbor" help="Neighbor information" cmd="cmd_show_ospf_neighbor">
           <token name="detail" help="Detailed information" argument="detail" cmd="cmd_show_ospf_neighbor_detail"/>
           <token name="router_id" help="Neighbor Router ID" argument="router_id" kind="string" cmd="cmd_show_ospf_neighbor">
