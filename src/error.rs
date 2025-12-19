@@ -9,8 +9,8 @@ use indextree::NodeId;
 #[derive(Debug)]
 pub enum Error {
     Parser(ParserError),
-    EditConfig(yang3::Error),
-    ValidateConfig(yang3::Error),
+    EditConfig(yang4::Error),
+    ValidateConfig(yang4::Error),
     Callback(String),
     Backend(tonic::Status),
 }

@@ -5,7 +5,7 @@
 //
 
 use indextree::{Arena, NodeId};
-use yang3::schema::SchemaNode;
+use yang4::schema::SchemaNode;
 
 use crate::parser::ParsedArgs;
 use crate::session::Session;

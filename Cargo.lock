@@ -213,8 +213,6 @@ version = "1.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e3a13707ac958681c13b39b458c073d0d9bc8a22cb1b2f4c8e55eb72c13f362"
 dependencies = [
- "jobserver",
- "libc",
  "shlex",
 ]
 
@@ -552,7 +550,7 @@ dependencies = [
  "tonic",
  "tonic-build",
  "xml-rs",
- "yang3",
+ "yang4",
 ]
 
 [[package]]
@@ -777,16 +775,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
-name = "jobserver"
-version = "0.1.33"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38f262f097c174adebe41eb73d66ae9c06b2844fb0da69969647bbddd9b0538a"
-dependencies = [
- "getrandom 0.3.2",
- "libc",
-]
-
-[[package]]
 name = "js-sys"
 version = "0.3.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -819,12 +807,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "libyang3-sys"
-version = "0.6.0"
+name = "libyang4-sys"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8059af16246b8d34f95e3f667e5834d74d6b55c5f4b0bced074910b031df4e2"
+checksum = "a21e9b33465f2c872155d44f318b72efac73dd4063690a98e73a31d09552f0f2"
 dependencies = [
- "cc",
  "cmake",
  "pkg-config",
 ]
@@ -2039,14 +2026,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a62ce76d9b56901b19a74f19431b0d8b3bc7ca4ad685a746dfd78ca8f4fc6bda"
 
 [[package]]
-name = "yang3"
-version = "0.16.0"
+name = "yang4"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa7afa7707fefb8c3143efb2b76b16f3d1d9107e860834074538b35afe6137d2"
+checksum = "42f331187c087be4b9e5c823bd48ceec13b3628192278b19ea86b662764fd2d7"
 dependencies = [
  "bitflags 2.9.0",
  "libc",
- "libyang3-sys",
+ "libyang4-sys",
+ "log",
  "num-derive",
  "num-traits",
 ]

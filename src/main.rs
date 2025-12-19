@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use clap::{App, Arg};
 use reedline::Signal;
-use yang3::context::{Context, ContextFlags};
+use yang4::context::{Context, ContextFlags};
 
 use crate::error::Error;
 use crate::grpc::GrpcClient;

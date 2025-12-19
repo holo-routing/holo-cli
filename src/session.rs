@@ -7,10 +7,10 @@
 use derive_new::new;
 use enum_as_inner::EnumAsInner;
 use indextree::NodeId;
-use yang3::data::{
+use yang4::data::{
     Data, DataFormat, DataParserFlags, DataTree, DataValidationFlags,
 };
-use yang3::schema::{SchemaNode, SchemaNodeKind};
+use yang4::schema::{SchemaNode, SchemaNodeKind};
 
 use crate::error::Error;
 use crate::grpc::{GrpcClient, proto};
@@ -154,7 +154,7 @@ impl Session {
         negate: bool,
         snode: &SchemaNode<'_>,
         mut args: ParsedArgs,
-    ) -> Result<(), yang3::Error> {
+    ) -> Result<(), yang4::Error> {
         // Get data path and CLI path corresponding to the current node.
         let mut path = self.mode.data_path().unwrap_or_default();
         let mut cli_path = self.mode.cli_path().unwrap_or_default();
@@ -209,8 +209,8 @@ impl Session {
 
         // Get leaf/leaf-list's value.
         let value = match snode.kind() {
-            yang3::schema::SchemaNodeKind::Leaf
-            | yang3::schema::SchemaNodeKind::LeafList
+            yang4::schema::SchemaNodeKind::Leaf
+            | yang4::schema::SchemaNodeKind::LeafList
                 if !snode.is_list_key() =>
             {
                 if let Some((_, value)) = args.pop_front() {

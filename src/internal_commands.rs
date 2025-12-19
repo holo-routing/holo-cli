@@ -11,11 +11,11 @@ use std::process::{Child, Command, Stdio};
 use indextree::NodeId;
 use prettytable::{Table, format, row};
 use similar::TextDiff;
-use yang3::data::{
+use yang4::data::{
     Data, DataFormat, DataNodeRef, DataOperation, DataParserFlags,
     DataPrinterFlags, DataTree, DataValidationFlags,
 };
-use yang3::schema::SchemaNodeKind;
+use yang4::schema::SchemaNodeKind;
 
 use crate::YANG_CTX;
 use crate::grpc::proto;
@@ -2028,6 +2028,7 @@ pub fn cmd_clear_isis_adjacency(
         yang_ctx,
         data,
         DataFormat::JSON,
+        DataParserFlags::empty(),
         DataOperation::RpcYang,
     )
     .expect("Failed to parse data tree");
@@ -2049,6 +2050,7 @@ pub fn cmd_clear_isis_database(
         yang_ctx,
         data,
         DataFormat::JSON,
+        DataParserFlags::empty(),
         DataOperation::RpcYang,
     )
     .expect("Failed to parse data tree");
