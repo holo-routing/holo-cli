@@ -784,6 +784,26 @@ pub fn cmd_show_isis_adjacency(
         .column_leaf("Level", "usage")
         .column_leaf("State", "state")
         .column_leaf("Holdtime", "hold-timer")
+        .column_from_fn(
+            "SPB",
+            Box::new(|dnode| {
+                // Check if neighbor advertises NLPID 0xC1 (193) for SPB
+                const NLPID_SPB: u8 = 0xC1;
+                let has_spb = dnode
+                    .children()
+                    .filter(|child| {
+                        child.schema().name() == "protocol-supported"
+                    })
+                    .filter_map(|child| child.value_canonical())
+                    .filter_map(|val| val.parse::<u8>().ok())
+                    .any(|nlpid| nlpid == NLPID_SPB);
+                if has_spb {
+                    "yes".to_string()
+                } else {
+                    "no".to_string()
+                }
+            }),
+        )
         .show()?;
 
     Ok(false)
