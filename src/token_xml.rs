@@ -76,6 +76,7 @@ fn parse_tag_token(
         "cmd_exit_config" => internal_commands::cmd_exit_config,
         "cmd_end" => internal_commands::cmd_end,
         "cmd_pwd" => internal_commands::cmd_pwd,
+        "cmd_top" => internal_commands::cmd_top,
         "cmd_discard" => internal_commands::cmd_discard,
         "cmd_commit" => internal_commands::cmd_commit,
         "cmd_validate" => internal_commands::cmd_validate,

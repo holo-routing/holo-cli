@@ -470,6 +470,17 @@ pub fn cmd_pwd(
     Ok(false)
 }
 
+// ===== "top" =====
+
+pub fn cmd_top(
+    _commands: &Commands,
+    session: &mut Session,
+    _args: ParsedArgs,
+) -> Result<bool, String> {
+    session.mode_config_top();
+    Ok(false)
+}
+
 // ===== "discard" =====
 
 pub fn cmd_discard(

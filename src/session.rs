@@ -149,6 +149,12 @@ impl Session {
         self.update_prompt();
     }
 
+    pub fn mode_config_top(&mut self) {
+        let nodes = self.mode.as_configure_mut().unwrap();
+        nodes.clear();
+        self.update_prompt();
+    }
+
     pub fn edit_candidate(
         &mut self,
         negate: bool,
