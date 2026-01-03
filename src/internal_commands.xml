@@ -177,6 +177,7 @@
     <token name="exit" help="Exit from current mode." cmd="cmd_exit_config"/>
     <token name="list" help="Print command list." cmd="cmd_list"/>
     <token name="pwd" help="Display current mode path." cmd="cmd_pwd"/>
+    <token name="top" help="Return to top-level configuration mode." cmd="cmd_top"/>
     <token name="show" help="Show information about the system.">
       <token name="candidate" argument="configuration" help="Show candidate configuration." cmd="cmd_show_config">
         <token name="format" help="Configuration format.">
