@@ -159,7 +159,7 @@ fn main() {
     // Connect to the daemon.
     let raw_addr = matches
         .value_of("address")
-        .unwrap_or("[::1]:50051") // no http:// in default
+        .unwrap_or("127.0.0.1:50051") // no http:// in default
         .to_string();
 
     // Prepend http:// if not already present
