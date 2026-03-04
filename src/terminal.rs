@@ -10,8 +10,8 @@ use std::sync::{Arc, Mutex};
 use indextree::NodeId;
 use itertools::Itertools;
 use reedline::{
-    ColumnarMenu, Completer, FileBackedHistory, KeyCode, KeyModifiers,
-    MenuBuilder, Prompt, PromptEditMode, PromptHistorySearch,
+    ColumnarMenu, Completer, EditCommand, FileBackedHistory, KeyCode,
+    KeyModifiers, MenuBuilder, Prompt, PromptEditMode, PromptHistorySearch,
     PromptHistorySearchStatus, Reedline, ReedlineEvent, ReedlineMenu, Span,
     Suggestion, Vi,
 };
@@ -175,10 +175,24 @@ pub fn reedline_init(
             ReedlineEvent::MenuNext,
         ]),
     );
+
+    // <CRTL + z> switches to user exec mode
     insert_keybindings.add_binding(
         KeyModifiers::CONTROL,
         KeyCode::Char('z'),
         ReedlineEvent::ExecuteHostCommand("end".to_owned()),
+    );
+
+    // <CTRL + c> cancels command & jumps to next line
+    insert_keybindings.add_binding(
+        reedline::KeyModifiers::CONTROL,
+        reedline::KeyCode::Char('c'),
+        reedline::ReedlineEvent::Multiple(vec![
+            ReedlineEvent::Edit(vec![EditCommand::InsertString(
+                "^C".to_string(),
+            )]),
+            ReedlineEvent::Enter,
+        ]),
     );
 
     let edit_mode = Box::new(Vi::new(insert_keybindings, normal_keybindings));
