@@ -1078,7 +1078,7 @@ pub fn cmd_show_ospf_neighbor(
         .column_leaf("Interface", "name")
         .xpath(XPATH_OSPF_NEIGHBOR)
         .filter_list_key(
-            "neighbor-router-id=",
+            "neighbor-router-id",
             get_opt_arg(&mut args, "router_id"),
         )
         .column_from_fn(
