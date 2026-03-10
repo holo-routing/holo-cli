@@ -94,7 +94,8 @@ fn add_token(
         .then(|| Action::ConfigEdit(snode.clone()));
     let node_update = snode.kind() == SchemaNodeKind::List;
 
-    let token = Token::new(name, help, kind, argument, action, node_update);
+    let token =
+        Token::new(name, help, kind, argument, action, node_update, false);
     *token_id = commands.add_token(*token_id, token);
     snode_set_token_id(snode, *token_id);
 }
