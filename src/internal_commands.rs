@@ -5,8 +5,7 @@
 //
 
 use std::collections::BTreeMap;
-use std::fmt::Write;
-use std::process::{Child, Command, Stdio};
+use std::fmt::Write as _;
 
 use chrono::prelude::*;
 use indextree::NodeId;
@@ -19,6 +18,7 @@ use yang4::data::{
 use yang4::schema::SchemaNodeKind;
 
 use crate::YANG_CTX;
+use crate::error::CallbackError;
 use crate::grpc::proto;
 use crate::parser::ParsedArgs;
 use crate::session::{CommandMode, ConfigurationType, Session};
@@ -198,7 +198,7 @@ impl<'a> YangTableBuilder<'a> {
     }
 
     // Builds and displays the table.
-    pub fn show(self) -> Result<(), String> {
+    pub fn show(self) -> Result<(), CallbackError> {
         let xpath_req = "/ietf-routing:routing/control-plane-protocols";
 
         // Fetch data.
@@ -222,9 +222,11 @@ impl<'a> YangTableBuilder<'a> {
         let values = Vec::new();
         Self::show_path(&mut table, dnode, &self.paths, values);
 
-        // Print the table to stdout.
-        if let Err(error) = page_table(self.session, &table) {
-            println!("% failed to display data: {}", error);
+        // Print the table.
+        if !table.is_empty() {
+            let writer = self.session.writer();
+            table.print(writer)?;
+            writeln!(writer)?;
         }
 
         Ok(())
@@ -246,63 +248,13 @@ fn get_opt_arg(args: &mut ParsedArgs, name: &str) -> Option<String> {
     None
 }
 
-fn pager() -> Result<Child, std::io::Error> {
-    Command::new("less")
-        // Exit immediately if the data fits on one screen.
-        .arg("-F")
-        // Do not clear the screen on exit.
-        .arg("-X")
-        .stdin(Stdio::piped())
-        .spawn()
-}
-
-fn page_output(session: &Session, data: &str) -> Result<(), std::io::Error> {
-    if session.use_pager() {
-        use std::io::Write;
-
-        // Spawn the pager process.
-        let mut pager = pager()?;
-
-        // Feed the data to the pager.
-        pager.stdin.as_mut().unwrap().write_all(data.as_bytes())?;
-
-        // Wait for the pager process to finish.
-        pager.wait()?;
-    } else {
-        // Print the data directly to the console.
-        println!("{}", data);
-    }
-
-    Ok(())
-}
-
-fn page_table(session: &Session, table: &Table) -> Result<(), std::io::Error> {
-    if table.is_empty() {
-        return Ok(());
-    }
-
-    if session.use_pager() {
-        use std::io::Write;
-
-        // Spawn the pager process.
-        let mut pager = pager()?;
-
-        // Print the table.
-        let mut output = Vec::new();
-        table.print(&mut output)?;
-        writeln!(output)?;
-
-        // Feed the data to the pager.
-        pager.stdin.as_mut().unwrap().write_all(&output)?;
-
-        // Wait for the pager process to finish.
-        pager.wait()?;
-    } else {
-        // Print the table directly to the console.
-        table.printstd();
-        println!();
-    }
-
+fn write_output(
+    session: &mut Session,
+    data: &str,
+) -> Result<(), std::io::Error> {
+    let w = session.writer();
+    w.write_all(data.as_bytes())?;
+    writeln!(w)?;
     Ok(())
 }
 
@@ -365,7 +317,7 @@ pub fn cmd_config(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let mode = CommandMode::Configure { nodes: vec![] };
     session.mode_set(mode);
     Ok(false)
@@ -377,7 +329,7 @@ pub fn cmd_exit_exec(
     _commands: &Commands,
     _session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     // Do nothing.
     Ok(true)
 }
@@ -386,7 +338,7 @@ pub fn cmd_exit_config(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     session.mode_config_exit();
     Ok(false)
 }
@@ -397,7 +349,7 @@ pub fn cmd_end(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     session.mode_set(CommandMode::Operational);
     Ok(false)
 }
@@ -408,27 +360,32 @@ pub fn cmd_list(
     commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     match session.mode() {
         CommandMode::Operational => {
             // List EXEC-level commands.
-            cmd_list_root(commands, &commands.exec_root);
+            cmd_list_root(commands, session, &commands.exec_root);
         }
         CommandMode::Configure { .. } => {
             // List internal configuration commands first.
-            cmd_list_root(commands, &commands.config_dflt_internal);
-            println!("---");
-            cmd_list_root(commands, &commands.config_root_internal);
-            println!("---");
+            cmd_list_root(commands, session, &commands.config_dflt_internal);
+            writeln!(session.writer(), "---")?;
+            cmd_list_root(commands, session, &commands.config_root_internal);
+            writeln!(session.writer(), "---")?;
             // List YANG configuration commands.
-            cmd_list_root(commands, &session.mode().token(commands));
+            let yang_root = session.mode().token(commands);
+            cmd_list_root(commands, session, &yang_root);
         }
     }
 
     Ok(false)
 }
 
-pub fn cmd_list_root(commands: &Commands, top_token_id: &NodeId) {
+pub fn cmd_list_root(
+    commands: &Commands,
+    session: &mut Session,
+    top_token_id: &NodeId,
+) {
     for token_id in
         top_token_id
             .descendants(&commands.arena)
@@ -454,7 +411,7 @@ pub fn cmd_list_root(commands: &Commands, top_token_id: &NodeId) {
             cmd_string.push(' ');
         }
 
-        println!("{}", cmd_string);
+        let _ = writeln!(session.writer(), "{}", cmd_string);
     }
 }
 
@@ -464,7 +421,7 @@ pub fn cmd_pwd(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     println!(
         "{}",
         session.mode().data_path().unwrap_or_else(|| "/".to_owned())
@@ -478,7 +435,7 @@ pub fn cmd_top(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     session.mode_config_top();
     Ok(false)
 }
@@ -489,7 +446,7 @@ pub fn cmd_discard(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     session.candidate_discard();
     Ok(false)
 }
@@ -500,7 +457,7 @@ pub fn cmd_commit(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let comment = get_opt_arg(&mut args, "comment");
     match session.candidate_commit(comment) {
         Ok(_) => {
@@ -520,7 +477,7 @@ pub fn cmd_validate(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     match session.candidate_validate() {
         Ok(_) => println!("% candidate configuration validated successfully"),
         Err(error) => {
@@ -621,7 +578,7 @@ pub fn cmd_show_config(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     // Parse parameters.
     let config_type = get_arg(&mut args, "configuration");
     let config_type = match config_type.as_str() {
@@ -646,9 +603,7 @@ pub fn cmd_show_config(
         Some(_) => panic!("unknown format"),
         None => cmd_show_config_cmds(config, with_defaults),
     };
-    if let Err(error) = page_output(session, &data) {
-        println!("% failed to print configuration: {}", error)
-    }
+    write_output(session, &data)?;
 
     Ok(false)
 }
@@ -657,7 +612,7 @@ pub fn cmd_show_config_changes(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let running = session.get_configuration(ConfigurationType::Running);
     let running = cmd_show_config_cmds(running, false);
     let candidate = session.get_configuration(ConfigurationType::Candidate);
@@ -680,7 +635,7 @@ pub fn cmd_show_state(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let xpath = get_opt_arg(&mut args, "xpath");
     let format = get_opt_arg(&mut args, "format");
     let format = match format.as_deref() {
@@ -693,9 +648,7 @@ pub fn cmd_show_state(
     match session.get(proto::get_request::DataType::State, format, false, xpath)
     {
         Ok(proto::data_tree::Data::DataString(data)) => {
-            if let Err(error) = page_output(session, &data) {
-                println!("% failed to print state data: {}", error)
-            }
+            write_output(session, &data)?;
         }
         Ok(proto::data_tree::Data::DataBytes(_)) => unreachable!(),
         Err(error) => println!("% failed to fetch state data: {}", error),
@@ -710,7 +663,7 @@ pub fn cmd_show_yang_modules(
     _commands: &Commands,
     _session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     // Create the table
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
@@ -756,7 +709,7 @@ pub fn cmd_show_isis_interface(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     YangTableBuilder::new(session, proto::get_request::DataType::All)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_ISIS))
@@ -776,7 +729,7 @@ pub fn cmd_show_isis_adjacency(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let hostnames = isis_hostnames(session)?;
     YangTableBuilder::new(session, proto::get_request::DataType::State)
         .xpath(XPATH_PROTOCOL)
@@ -806,7 +759,7 @@ pub fn cmd_show_isis_database(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let hostnames = isis_hostnames(session)?;
     YangTableBuilder::new(session, proto::get_request::DataType::State)
         .xpath(XPATH_PROTOCOL)
@@ -838,7 +791,7 @@ pub fn cmd_show_isis_route(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     YangTableBuilder::new(session, proto::get_request::DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_ISIS))
@@ -907,7 +860,7 @@ pub fn cmd_show_ospf_interface(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ospfv2" => PROTOCOL_OSPFV2,
         "ospfv3" => PROTOCOL_OSPFV3,
@@ -946,9 +899,7 @@ pub fn cmd_show_ospf_interface_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
-    let mut output = String::new();
-
+) -> Result<bool, CallbackError> {
     // Parse arguments.
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ospfv2" => PROTOCOL_OSPFV2,
@@ -980,6 +931,7 @@ pub fn cmd_show_ospf_interface_detail(
             let area = dnode.child_value("area-id");
 
             // Iterate over OSPF interfaces.
+            let output = session.writer();
             for dnode in dnode.find_xpath(&xpath_iface).unwrap() {
                 writeln!(output, "{}", dnode.child_value("name")).unwrap();
                 writeln!(output, " instance: {}", instance).unwrap();
@@ -1009,10 +961,6 @@ pub fn cmd_show_ospf_interface_detail(
         }
     }
 
-    if let Err(error) = page_output(session, &output) {
-        println!("% failed to print data: {}", error)
-    }
-
     Ok(false)
 }
 
@@ -1020,7 +968,7 @@ pub fn cmd_show_ospf_vlink(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ospfv2" => PROTOCOL_OSPFV2,
         "ospfv3" => PROTOCOL_OSPFV3,
@@ -1061,7 +1009,7 @@ pub fn cmd_show_ospf_neighbor(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ospfv2" => PROTOCOL_OSPFV2,
         "ospfv3" => PROTOCOL_OSPFV3,
@@ -1107,9 +1055,7 @@ pub fn cmd_show_ospf_neighbor_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
-    let mut output = String::new();
-
+) -> Result<bool, CallbackError> {
     // Parse arguments.
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ospfv2" => PROTOCOL_OSPFV2,
@@ -1135,6 +1081,7 @@ pub fn cmd_show_ospf_neighbor_detail(
         fetch_data(session, proto::get_request::DataType::All, xpath_req)?;
 
     // Iterate over OSPF instances.
+    let output = session.writer();
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
         let instance = dnode.child_value("name");
 
@@ -1190,10 +1137,6 @@ pub fn cmd_show_ospf_neighbor_detail(
         }
     }
 
-    if let Err(error) = page_output(session, &output) {
-        println!("% failed to print data: {}", error)
-    }
-
     Ok(false)
 }
 
@@ -1201,7 +1144,7 @@ pub fn cmd_show_ospf_database_as(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ospfv2" => PROTOCOL_OSPFV2,
         "ospfv3" => PROTOCOL_OSPFV3,
@@ -1244,7 +1187,7 @@ pub fn cmd_show_ospf_database_area(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ospfv2" => PROTOCOL_OSPFV2,
         "ospfv3" => PROTOCOL_OSPFV3,
@@ -1289,7 +1232,7 @@ pub fn cmd_show_ospf_database_link(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ospfv2" => PROTOCOL_OSPFV2,
         "ospfv3" => PROTOCOL_OSPFV3,
@@ -1336,7 +1279,7 @@ pub fn cmd_show_ospf_route(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ospfv2" => PROTOCOL_OSPFV2,
         "ospfv3" => PROTOCOL_OSPFV3,
@@ -1364,7 +1307,7 @@ pub fn cmd_show_ospf_hostnames(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ospfv2" => PROTOCOL_OSPFV2,
         "ospfv3" => PROTOCOL_OSPFV3,
@@ -1425,7 +1368,7 @@ pub fn cmd_show_rip_interface(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     // Parse arguments.
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ripv2" => PROTOCOL_RIPV2,
@@ -1449,9 +1392,7 @@ pub fn cmd_show_rip_interface_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
-    let mut output = String::new();
-
+) -> Result<bool, CallbackError> {
     // Parse arguments.
     let protocol = match get_arg(&mut args, "protocol").as_str() {
         "ripv2" => PROTOCOL_RIPV2,
@@ -1479,6 +1420,7 @@ pub fn cmd_show_rip_interface_detail(
         fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
 
     // Iterate over RIP instances.
+    let output = session.writer();
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
         let instance = dnode.child_value("name");
 
@@ -1511,10 +1453,6 @@ pub fn cmd_show_rip_interface_detail(
         }
     }
 
-    if let Err(error) = page_output(session, &output) {
-        println!("% failed to print data: {}", error)
-    }
-
     Ok(false)
 }
 
@@ -1522,7 +1460,7 @@ pub fn cmd_show_rip_neighbor(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     // Parse arguments.
     let (protocol, afi, address) = match get_arg(&mut args, "protocol").as_str()
     {
@@ -1550,9 +1488,7 @@ pub fn cmd_show_rip_neighbor_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
-    let mut output = String::new();
-
+) -> Result<bool, CallbackError> {
     // Parse arguments.
     let (protocol, afi, address) = match get_arg(&mut args, "protocol").as_str()
     {
@@ -1581,6 +1517,7 @@ pub fn cmd_show_rip_neighbor_detail(
         fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
 
     // Iterate over RIP instances.
+    let output = session.writer();
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
         let instance = dnode.child_value("name");
 
@@ -1603,10 +1540,6 @@ pub fn cmd_show_rip_neighbor_detail(
         }
     }
 
-    if let Err(error) = page_output(session, &output) {
-        println!("% failed to print data: {}", error)
-    }
-
     Ok(false)
 }
 
@@ -1614,7 +1547,7 @@ pub fn cmd_show_rip_route(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     // Parse arguments.
     let (protocol, afi, prefix) = match get_arg(&mut args, "protocol").as_str()
     {
@@ -1662,7 +1595,7 @@ pub fn cmd_show_mpls_ldp_discovery(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     YangTableBuilder::new(session, proto::get_request::DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
@@ -1683,9 +1616,7 @@ pub fn cmd_show_mpls_ldp_discovery_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
-    let mut output = String::new();
-
+) -> Result<bool, CallbackError> {
     // Parse arguments.
     let name = get_opt_arg(&mut args, "name");
 
@@ -1709,6 +1640,7 @@ pub fn cmd_show_mpls_ldp_discovery_detail(
         fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
 
     // Iterate over MPLS LDP instances.
+    let output = session.writer();
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
         let instance = dnode.child_value("name");
 
@@ -1766,10 +1698,6 @@ pub fn cmd_show_mpls_ldp_discovery_detail(
         }
     }
 
-    if let Err(error) = page_output(session, &output) {
-        println!("% failed to print data: {}", error)
-    }
-
     Ok(false)
 }
 
@@ -1777,7 +1705,7 @@ pub fn cmd_show_mpls_ldp_peer(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     YangTableBuilder::new(session, proto::get_request::DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
@@ -1799,9 +1727,7 @@ pub fn cmd_show_mpls_ldp_peer_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
-    let mut output = String::new();
-
+) -> Result<bool, CallbackError> {
     // Parse arguments.
     let lsr_id = get_opt_arg(&mut args, "lsr-id");
 
@@ -1825,6 +1751,7 @@ pub fn cmd_show_mpls_ldp_peer_detail(
         fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
 
     // Iterate over MPLS LDP instances.
+    let output = session.writer();
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
         let instance = dnode.child_value("name");
 
@@ -1943,10 +1870,6 @@ pub fn cmd_show_mpls_ldp_peer_detail(
         }
     }
 
-    if let Err(error) = page_output(session, &output) {
-        println!("% failed to print data: {}", error)
-    }
-
     Ok(false)
 }
 
@@ -1954,7 +1877,7 @@ pub fn cmd_show_mpls_ldp_binding_address(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     YangTableBuilder::new(session, proto::get_request::DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
@@ -1988,7 +1911,7 @@ pub fn cmd_show_mpls_ldp_binding_fec(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     YangTableBuilder::new(session, proto::get_request::DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
@@ -2060,13 +1983,13 @@ pub fn cmd_show_bgp_summary(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let afi = get_opt_arg(&mut args, "afi").unwrap_or("ipv4".to_owned());
 
     let afi = match afi.as_str() {
         "ipv4" => "iana-bgp-types:ipv4-unicast",
         "ipv6" => "iana-bgp-types:ipv6-unicast",
-        _ => return Err(format!("Unsupported address family: {}", afi)),
+        _ => return Err(format!("Unsupported address family: {}", afi).into()),
     };
 
     let afi_xpath = format!("afi-safis/afi-safi[name='{}']/prefixes", afi);
@@ -2178,10 +2101,8 @@ pub fn cmd_show_bgp_neighbor(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let attrs = bgp_get_attrs(session).unwrap();
-
-    let mut output = String::new();
 
     let neighbor = get_arg(&mut args, "neighbor");
     let rt_type = get_arg(&mut args, "type");
@@ -2190,7 +2111,7 @@ pub fn cmd_show_bgp_neighbor(
     let afi = match afi.as_str() {
         "ipv4" => "ipv4-unicast",
         "ipv6" => "ipv6-unicast",
-        _ => return Err(format!("Unsupported address family: {}", afi)),
+        _ => return Err(format!("Unsupported address family: {}", afi).into()),
     };
 
     let rt_type = match rt_type.as_str() {
@@ -2216,6 +2137,8 @@ pub fn cmd_show_bgp_neighbor(
 
     let xpath_routes = format!("{}/route", &xpath_req);
 
+    let output = session.writer();
+
     writeln!(output, "\nAddress family: {afi}").unwrap();
     writeln!(
         output,
@@ -2227,11 +2150,7 @@ pub fn cmd_show_bgp_neighbor(
         let prefix = route.child_opt_value("prefix").unwrap();
         let index = route.child_opt_value("attr-index").unwrap();
         let route_attrs = attrs.get(&index).unwrap();
-        writeln!(output, "{:>20} {}", prefix, route_attrs).unwrap();
-    }
-
-    if let Err(error) = page_output(session, &output) {
-        println!("% failed to print data: {}", error)
+        writeln!(output, "{:>20} {}", prefix, route_attrs)?;
     }
 
     Ok(false)
@@ -2248,8 +2167,7 @@ pub fn cmd_show_bgp_neighbor_detail(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
-    let mut output = String::new();
+) -> Result<bool, CallbackError> {
     let neighbor_addr = get_opt_arg(&mut args, "neighbor");
 
     let xpath_bgp_instance = format!(
@@ -2269,6 +2187,7 @@ pub fn cmd_show_bgp_neighbor_detail(
         &xpath_bgp_instance,
     )?;
 
+    let output = session.writer();
     for dnode_inst in data.find_xpath(&xpath_bgp_instance).unwrap() {
         let local_as = dnode_inst.relative_value("ietf-bgp:bgp/global/as");
         let local_rid =
@@ -2469,10 +2388,6 @@ pub fn cmd_show_bgp_neighbor_detail(
         }
     }
 
-    if let Err(error) = page_output(session, &output) {
-        println!("% failed to print data: {}", error)
-    }
-
     Ok(false)
 }
 
@@ -2481,7 +2396,7 @@ pub fn cmd_clear_isis_adjacency(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let yang_ctx = YANG_CTX.get().unwrap();
     let data = r#"{"ietf-isis:clear-adjacency": {}}"#;
     let data = DataTree::parse_op_string(
@@ -2503,7 +2418,7 @@ pub fn cmd_clear_isis_database(
     _commands: &Commands,
     session: &mut Session,
     _args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let yang_ctx = YANG_CTX.get().unwrap();
     let data = r#"{"ietf-isis:clear-database": {}}"#;
     let data = DataTree::parse_op_string(
@@ -2528,7 +2443,7 @@ pub fn cmd_clear_bgp_neighbor(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let neighbor = get_opt_arg(&mut args, "neighbor");
     let clear_type = get_opt_arg(&mut args, "type");
     let yang_ctx = YANG_CTX.get().unwrap();
@@ -2599,7 +2514,7 @@ pub fn cmd_show_route(
     _commands: &Commands,
     session: &mut Session,
     mut args: ParsedArgs,
-) -> Result<bool, String> {
+) -> Result<bool, CallbackError> {
     let rib_name = get_opt_arg(&mut args, "afi").unwrap_or("ipv4".to_owned());
     let fetch_xpath = format!("{}[name='{}']", XPATH_RIB, rib_name);
     let route_xpath = format!("{}/routes/route", fetch_xpath);
@@ -2611,7 +2526,7 @@ pub fn cmd_show_route(
         return Ok(false);
     };
 
-    let mut output = String::new();
+    let output = session.writer();
 
     for route in dnode.find_xpath(&route_xpath).unwrap() {
         let prefix = route.child_value("destination-prefix");
@@ -2654,11 +2569,6 @@ pub fn cmd_show_route(
             }
             (None, None) => {}
         }
-    }
-
-    if !output.is_empty() {
-        page_output(session, &output)
-            .map_err(|e| format!("% failed to display data: {}", e))?;
     }
 
     Ok(false)

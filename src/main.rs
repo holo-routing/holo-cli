@@ -8,6 +8,7 @@ mod error;
 mod grpc;
 mod internal_commands;
 mod parser;
+mod pipe;
 mod session;
 mod terminal;
 mod token;
@@ -20,11 +21,11 @@ use clap::{App, Arg};
 use reedline::Signal;
 use yang4::context::{Context, ContextFlags};
 
-use crate::error::Error;
+use crate::error::{CallbackError, Error};
 use crate::grpc::GrpcClient;
 use crate::session::{CommandMode, Session};
 use crate::terminal::CliPrompt;
-use crate::token::{Action, Commands};
+use crate::token::{Action, Commands, is_pipeable};
 
 // Global YANG context.
 pub static YANG_CTX: OnceLock<Arc<Context>> = OnceLock::new();
@@ -58,28 +59,87 @@ impl Cli {
             None => return Ok(false),
         };
 
-        // Parse command.
+        // Split on pipe characters.
+        let (base_line, pipe_segments) = pipe::split_on_pipes(&line);
+
+        // Parse pipe commands (validated early for fast error
+        // reporting).
+        let parsed_pipes = self
+            .commands
+            .pipe_registry
+            .parse_pipes(&pipe_segments)
+            .map_err(Error::Pipe)?;
+
+        // Parse base command.
         let pcmd =
-            parser::parse_command(&mut self.session, &self.commands, &line)
+            parser::parse_command(&mut self.session, &self.commands, base_line)
                 .map_err(Error::Parser)?;
         let token = self.commands.get_token(pcmd.token_id);
         let negate = pcmd.negate;
         let args = pcmd.args;
+
+        // Validate pipes are allowed for this command.
+        if !parsed_pipes.is_empty()
+            && !is_pipeable(&self.commands, pcmd.token_id)
+        {
+            return Err(Error::Pipe(pipe::PipeError::NotAllowed));
+        }
 
         // Process command.
         let mut exit = false;
         if let Some(action) = &token.action {
             match action {
                 Action::ConfigEdit(snode) => {
-                    // Edit configuration & update CLI node if necessary.
+                    // Edit configuration & update CLI node if
+                    // necessary.
                     self.session
                         .edit_candidate(negate, snode, args)
                         .map_err(Error::EditConfig)?;
                 }
                 Action::Callback(callback) => {
+                    // Set up output: pipe chain (with
+                    // optional pager), pager only, or stdout.
+                    let pipe_chain = match pipe::PipeChain::spawn(
+                        &self.commands.pipe_registry,
+                        &parsed_pipes,
+                        self.session.use_pager(),
+                    ) {
+                        Ok(mut chain) => {
+                            let writer = chain.take_writer();
+                            self.session.set_writer(writer);
+                            Some(chain)
+                        }
+                        Err(e) if parsed_pipes.is_empty() => {
+                            // Pager-only failure — fall back to
+                            // stdout.
+                            eprintln!("% {}", e);
+                            None
+                        }
+                        Err(e) => return Err(Error::Pipe(e)),
+                    };
+
                     // Execute callback.
-                    exit = (callback)(&self.commands, &mut self.session, args)
-                        .map_err(Error::Callback)?;
+                    let result =
+                        (callback)(&self.commands, &mut self.session, args);
+
+                    // Clean up: reset writer and finish pipe
+                    // chain / pager.
+                    self.session.set_writer(None);
+                    if let Some(chain) = pipe_chain {
+                        let _ = chain.finish();
+                    }
+
+                    // Handle callback result, treating
+                    // BrokenPipe as non-fatal.
+                    match result {
+                        Ok(should_exit) => exit = should_exit,
+                        Err(CallbackError::BrokenPipe) => {
+                            // Pipe closed early — not an error.
+                        }
+                        Err(e) => {
+                            return Err(Error::Callback(e));
+                        }
+                    }
                 }
             }
         }

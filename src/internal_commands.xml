@@ -4,8 +4,8 @@
     <token name="configure" help="Manipulate software configuration information." cmd="cmd_config"/>
     <token name="exit" help="Exit the management session." cmd="cmd_exit_exec"/>
     <token name="end" help="Terminate configuration session." cmd="cmd_end"/>
-    <token name="list" help="Print command list." cmd="cmd_list"/>
-    <token name="show" help="Show information about the system.">
+    <token name="list" help="Print command list." cmd="cmd_list" pipe="true"/>
+    <token name="show" help="Show information about the system." pipe="true">
       <token name="running" argument="configuration" help="Show running configuration." cmd="cmd_show_config">
         <token name="format" help="Configuration format.">
           <token name="json" argument="format" help="JSON output format." cmd="cmd_show_config">
@@ -216,7 +216,7 @@
     </token>
     <token name="end" help="Terminate configuration session." cmd="cmd_end"/>
     <token name="exit" help="Exit from current mode." cmd="cmd_exit_config"/>
-    <token name="list" help="Print command list." cmd="cmd_list"/>
+    <token name="list" help="Print command list." cmd="cmd_list" pipe="true"/>
     <token name="pwd" help="Display current mode path." cmd="cmd_pwd"/>
     <token name="top" help="Return to top-level configuration mode." cmd="cmd_top"/>
     <token name="show" help="Show information about the system.">
