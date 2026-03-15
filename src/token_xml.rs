@@ -33,11 +33,11 @@ pub fn gen_cmds(commands: &mut Commands) {
                     _ => continue,
                 };
 
-                // Update stack of tokens.
+                // Update stacks.
                 stack.push(token_id);
             }
             Ok(XmlEvent::EndElement { .. }) => {
-                // Update stack of tokens.
+                // Update stacks.
                 stack.pop();
             }
             Ok(_) => (),
@@ -69,6 +69,7 @@ fn parse_tag_token(
     let kind = find_opt_attribute(&attributes, "kind");
     let argument = find_opt_attribute(&attributes, "argument");
     let cmd_name = find_opt_attribute(&attributes, "cmd");
+    let pipeable = find_opt_attribute(&attributes, "pipe") == Some("true");
     let callback = cmd_name.map(|name| match name {
         "cmd_config" => internal_commands::cmd_config,
         "cmd_list" => internal_commands::cmd_list,
@@ -156,7 +157,7 @@ fn parse_tag_token(
     let action = callback.map(|callback| Action::Callback(callback));
 
     // Add new token.
-    let token = Token::new(name, help, kind, argument, action, false);
+    let token = Token::new(name, help, kind, argument, action, false, pipeable);
 
     // Link new token.
     commands.add_token(parent, token)
