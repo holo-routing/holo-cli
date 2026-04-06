@@ -2476,8 +2476,6 @@ pub fn cmd_clear_bgp_neighbor(
         .print_string(DataFormat::JSON, DataPrinterFlags::WD_ALL)
         .unwrap();
 
-    println!("{}", data);
-
     let data = DataTree::parse_op_string(
         yang_ctx,
         data,
