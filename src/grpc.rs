@@ -8,10 +8,10 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 
 use proto::northbound_client::NorthboundClient;
-use yang4::data::{
+use yang5::data::{
     Data, DataDiffFlags, DataFormat, DataPrinterFlags, DataTree,
 };
-use yang4::ffi;
+use yang5::ffi;
 
 use crate::YANG_MODULES_DIR;
 use crate::error::Error;
@@ -54,7 +54,7 @@ impl GrpcClient {
     pub fn load_modules(
         &mut self,
         dest: &'static str,
-        yang_ctx: &mut yang4::context::Context,
+        yang_ctx: &mut yang5::context::Context,
     ) {
         // Retrieve the set of capabilities supported by the daemon.
         let capabilities = self

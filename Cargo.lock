@@ -546,7 +546,7 @@ dependencies = [
  "tonic",
  "tonic-build",
  "xml-rs",
- "yang4",
+ "yang5",
 ]
 
 [[package]]
@@ -803,10 +803,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "libyang4-sys"
-version = "0.1.1"
+name = "libyang5-sys"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a21e9b33465f2c872155d44f318b72efac73dd4063690a98e73a31d09552f0f2"
+checksum = "8d2af2bd5e6a586aee12e07735a223e232969686ac4ac5b7af639e555ec4a1e1"
 dependencies = [
  "cmake",
  "pkg-config",
@@ -2028,14 +2028,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a62ce76d9b56901b19a74f19431b0d8b3bc7ca4ad685a746dfd78ca8f4fc6bda"
 
 [[package]]
-name = "yang4"
+name = "yang5"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42f331187c087be4b9e5c823bd48ceec13b3628192278b19ea86b662764fd2d7"
+checksum = "8e5ebbf669599b5c407efa54e675230eb61d963a3d7452ddea205b6819a24064"
 dependencies = [
  "bitflags 2.9.0",
  "libc",
- "libyang4-sys",
+ "libyang5-sys",
  "log",
  "num-derive",
  "num-traits",

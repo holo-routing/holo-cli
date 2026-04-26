@@ -11,11 +11,11 @@ use chrono::prelude::*;
 use indextree::NodeId;
 use prettytable::{Table, format, row};
 use similar::TextDiff;
-use yang4::data::{
+use yang5::data::{
     Data, DataFormat, DataNodeRef, DataOperation, DataParserFlags,
     DataPrinterFlags, DataTree, DataValidationFlags,
 };
-use yang4::schema::SchemaNodeKind;
+use yang5::schema::SchemaNodeKind;
 
 use crate::YANG_CTX;
 use crate::error::CallbackError;
