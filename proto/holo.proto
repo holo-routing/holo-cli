@@ -49,6 +49,9 @@ service Northbound {
 
   // Retrieve configuration data from the rollback log.
   rpc GetTransaction(GetTransactionRequest) returns (GetTransactionResponse) {}
+
+  // Subscribe to receive YANG-modeled notifications.
+  rpc Subscribe(SubscribeRequest) returns (stream Notification) {}
 }
 
 // ----------------------- Parameters and return types -------------------------
@@ -127,8 +130,8 @@ message GetRequest {
   // Include implicit default nodes.
   bool with_defaults = 3;
 
-  // Requested YANG path.
-  string path = 4;
+  // Target YANG path.
+  Path path = 4;
 }
 
 message GetResponse {
@@ -250,6 +253,32 @@ message GetTransactionResponse {
   DataTree config = 1;
 }
 
+//
+// RPC: Subscribe()
+//
+message SubscribeRequest {
+  // Encoding to be used for notification data.
+  Encoding encoding = 1;
+
+  // Optional YANG data path to filter notifications.
+  // If empty, all notifications are delivered.
+  string path = 2;
+}
+
+message Notification {
+  // Return values:
+  // - grpc::StatusCode::OK: Success.
+
+  // Timestamp in nanoseconds since Epoch.
+  int64 timestamp = 1;
+
+  // The YANG notification data path.
+  string module_path = 2;
+
+  // The notification data.
+  DataTree data = 3;
+}
+
 // -------------------------------- Definitions --------------------------------
 
 // YANG module.
@@ -278,6 +307,21 @@ enum Encoding {
 enum SchemaFormat {
   YANG = 0;
   YIN = 1;
+}
+
+// YANG data path, represented as a sequence of path elements.
+message Path {
+  // Ordered list of elements forming the path.
+  repeated PathElem elem = 1;
+}
+
+// A single element within a YANG data path.
+message PathElem {
+  // Name of the data tree node.
+  string name = 1;
+
+  // List keys for this node.
+  map<string, string> key = 2;
 }
 
 // YANG instance data.
