@@ -11,8 +11,8 @@ use crate::pipe::PipeError;
 #[derive(Debug)]
 pub enum Error {
     Parser(ParserError),
-    EditConfig(yang4::Error),
-    ValidateConfig(yang4::Error),
+    EditConfig(yang5::Error),
+    ValidateConfig(yang5::Error),
     Callback(CallbackError),
     Backend(tonic::Status),
     Pipe(PipeError),

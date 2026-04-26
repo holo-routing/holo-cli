@@ -9,7 +9,7 @@ use std::os::raw::c_void;
 
 use indextree::NodeId;
 use itertools::Itertools;
-use yang4::schema::{DataValueType, SchemaNode, SchemaNodeKind};
+use yang5::schema::{DataValueType, SchemaNode, SchemaNodeKind};
 
 use crate::YANG_CTX;
 use crate::parser::ParsedArgs;
