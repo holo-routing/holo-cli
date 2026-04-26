@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 //
 
-use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 
@@ -100,9 +99,8 @@ impl GrpcClient {
         data_type: proto::get_request::DataType,
         format: DataFormat,
         with_defaults: bool,
-        xpath: Option<String>,
+        path: Option<proto::Path>,
     ) -> Result<proto::data_tree::Data, Error> {
-        let path = xpath.map(|x| proto::Path::from_xpath(&x));
         let data = self
             .rpc_sync_get(proto::GetRequest {
                 r#type: data_type as i32,
@@ -251,43 +249,6 @@ impl proto::DataTree {
             encoding,
             data: Some(data),
         }
-    }
-}
-
-// ===== impl proto::Path =====
-
-impl proto::Path {
-    pub fn from_xpath(xpath: &str) -> Self {
-        let elems = xpath
-            .split('/')
-            .filter(|s| !s.is_empty())
-            .map(|segment| {
-                let (name, keys) = match segment.find('[') {
-                    Some(pos) => {
-                        let name = &segment[..pos];
-                        let mut keys = HashMap::new();
-                        for kv in segment[pos..].split('[').filter(|s| !s.is_empty())
-                        {
-                            let kv = kv.trim_end_matches(']');
-                            if let Some(eq_pos) = kv.find('=') {
-                                let key = kv[..eq_pos].to_owned();
-                                let value = kv[eq_pos + 1..]
-                                    .trim_matches('\'')
-                                    .to_owned();
-                                keys.insert(key, value);
-                            }
-                        }
-                        (name, keys)
-                    }
-                    None => (segment, HashMap::new()),
-                };
-                proto::PathElem {
-                    name: name.to_owned(),
-                    key: keys,
-                }
-            })
-            .collect();
-        proto::Path { elem: elems }
     }
 }
 

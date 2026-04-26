@@ -313,10 +313,9 @@ impl Session {
         data_type: proto::get_request::DataType,
         format: DataFormat,
         with_defaults: bool,
-        xpath: Option<String>,
+        path: Option<proto::Path>,
     ) -> Result<proto::data_tree::Data, Error> {
-        self.grpc_client
-            .get(data_type, format, with_defaults, xpath)
+        self.grpc_client.get(data_type, format, with_defaults, path)
     }
 
     pub fn execute(
