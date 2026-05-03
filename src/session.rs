@@ -62,6 +62,8 @@ impl Session {
                 data_format,
                 false,
                 None,
+                0,
+                &[],
             )
             .unwrap();
         let running = DataTree::parse_string(
@@ -314,9 +316,17 @@ impl Session {
         format: DataFormat,
         with_defaults: bool,
         xpath: Option<String>,
+        max_depth: u32,
+        exclude: &[String],
     ) -> Result<proto::data_tree::Data, Error> {
-        self.grpc_client
-            .get(data_type, format, with_defaults, xpath)
+        self.grpc_client.get(
+            data_type,
+            format,
+            with_defaults,
+            xpath,
+            max_depth,
+            exclude,
+        )
     }
 
     pub fn execute(

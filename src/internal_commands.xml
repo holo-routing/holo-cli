@@ -18,16 +18,28 @@
       </token>
       <token name="state" help="Show operational state." cmd="cmd_show_state">
         <token name="xpath" help="XPath expression.">
-  	  <token name="xpath" argument="xpath" kind="string" help="XPath expression." cmd="cmd_show_state">
+  	      <token name="xpath" argument="xpath" kind="string" help="XPath expression." cmd="cmd_show_state">
             <token name="format" help="Data format.">
               <token name="json" argument="format" help="JSON output format." cmd="cmd_show_state"/>
-	      <token name="xml" argument="format" help="XML output format." cmd="cmd_show_state"/>
+	          <token name="xml" argument="format" help="XML output format." cmd="cmd_show_state"/>
+            </token>
+            <token name="depth" help="Max depth YANG tree traversal.">
+              <token name="N" argument="depth" kind="string" help="Max depth (positive integer)." cmd="cmd_show_state"/>
+            </token>
+            <token name="exclude" help="YANG node names to exclude from response.">
+              <token name="LIST" argument="exclude" kind="string" help="Comma-separated names (name1,name2,...)." cmd="cmd_show_state"/>
             </token>
           </token>
         </token>
         <token name="format" help="Data format.">
           <token name="json" argument="format" help="JSON output format." cmd="cmd_show_state"/>
           <token name="xml" argument="format" help="XML output format." cmd="cmd_show_state"/>
+        </token>
+        <token name="depth" help="Max depth YANG tree traversal.">
+          <token name="N" argument="depth" kind="string" help="Max depth (positive integer)." cmd="cmd_show_state"/>
+        </token>
+        <token name="exclude" help="YANG node names to exclude from response.">
+          <token name="LIST" argument="exclude" kind="string" help="Comma-separated names (name1,name2,...)." cmd="cmd_show_state"/>
         </token>
       </token>
       <token name="yang" help="YANG information.">
