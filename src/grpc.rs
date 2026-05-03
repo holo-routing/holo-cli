@@ -101,14 +101,30 @@ impl GrpcClient {
         format: DataFormat,
         with_defaults: bool,
         xpath: Option<String>,
+        max_depth: u32,
+        exclude: &[String],
     ) -> Result<proto::data_tree::Data, Error> {
-        let path = xpath.map(|x| proto::Path::from_xpath(&x));
+        let path = match xpath {
+            Some(x) => {
+                let mut p = proto::Path::from_xpath(&x);
+                p.max_depth = max_depth;
+                Some(p)
+            }
+            None if max_depth > 0 => Some(proto::Path {
+                elem: Vec::new(),
+                max_depth,
+            }),
+            None => None,
+        };
+        let exclude =
+            exclude.iter().map(|s| proto::Path::from_xpath(s)).collect();
         let data = self
             .rpc_sync_get(proto::GetRequest {
                 r#type: data_type as i32,
                 encoding: proto::Encoding::from(format) as i32,
                 with_defaults,
                 path,
+                exclude,
             })
             .map_err(Error::Backend)?
             .into_inner()
@@ -266,7 +282,8 @@ impl proto::Path {
                     Some(pos) => {
                         let name = &segment[..pos];
                         let mut keys = HashMap::new();
-                        for kv in segment[pos..].split('[').filter(|s| !s.is_empty())
+                        for kv in
+                            segment[pos..].split('[').filter(|s| !s.is_empty())
                         {
                             let kv = kv.trim_end_matches(']');
                             if let Some(eq_pos) = kv.find('=') {
@@ -287,7 +304,10 @@ impl proto::Path {
                 }
             })
             .collect();
-        proto::Path { elem: elems }
+        proto::Path {
+            elem: elems,
+            max_depth: 0,
+        }
     }
 }
 
