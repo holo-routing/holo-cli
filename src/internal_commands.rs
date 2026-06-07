@@ -31,6 +31,7 @@ const XPATH_RIB: &str = "/ietf-routing:routing/ribs/rib";
 struct YangTableBuilder<'a> {
     session: &'a mut Session,
     data_type: proto::get_request::DataType,
+    fetch_path: Option<&'a str>,
     paths: Vec<(String, Vec<YangTableColumn>)>,
 }
 
@@ -61,6 +62,7 @@ impl<'a> YangTableBuilder<'a> {
         Self {
             session,
             data_type,
+            fetch_path: None,
             paths: Vec::new(),
         }
     }
@@ -68,6 +70,12 @@ impl<'a> YangTableBuilder<'a> {
     // Adds an XPath to the builder.
     pub fn xpath(mut self, xpath: &'a str) -> Self {
         self.paths.push((xpath.to_owned(), Vec::new()));
+        self
+    }
+
+    // Sets the fetch path for the builder.
+    pub fn fetch_path(mut self, fetch_path: &'a str) -> Self {
+        self.fetch_path = Some(fetch_path);
         self
     }
 
@@ -199,7 +207,14 @@ impl<'a> YangTableBuilder<'a> {
 
     // Builds and displays the table.
     pub fn show(self) -> Result<(), CallbackError> {
-        let xpath_req = "/ietf-routing:routing/control-plane-protocols";
+        let xpath_req = if let Some(path) = self.fetch_path {
+            path
+        } else {
+            match self.paths.first() {
+                Some((x, _)) => x,
+                None => "/ietf-routing:routing/control-plane-protocols",
+            }
+        };
 
         // Fetch data.
         let data = fetch_data(self.session, self.data_type, xpath_req)?;
@@ -820,10 +835,12 @@ fn isis_hostnames(
     let data =
         fetch_data(session, proto::get_request::DataType::State, &xpath)?;
 
+    let Ok(dref) = data.find_path(&xpath) else {
+        return Ok(Default::default());
+    };
+
     // Collect hostname mappings into a binary tree.
-    let hostnames = data
-        .find_path(&xpath)
-        .unwrap()
+    let hostnames = dref
         .find_xpath("hostname")
         .unwrap()
         .filter_map(|dnode| {
@@ -909,7 +926,6 @@ pub fn cmd_show_ospf_interface_detail(
     let name = get_opt_arg(&mut args, "name");
 
     // Fetch data.
-    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
         "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
         protocol
@@ -919,8 +935,11 @@ pub fn cmd_show_ospf_interface_detail(
     if let Some(name) = &name {
         xpath_iface = format!("{}[name='{}']", xpath_iface, name);
     }
-    let data =
-        fetch_data(session, proto::get_request::DataType::All, xpath_req)?;
+    let data = fetch_data(
+        session,
+        proto::get_request::DataType::All,
+        &xpath_instance,
+    )?;
 
     // Iterate over OSPF instances.
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
@@ -1065,7 +1084,6 @@ pub fn cmd_show_ospf_neighbor_detail(
     let router_id = get_opt_arg(&mut args, "router_id");
 
     // Fetch data.
-    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
         "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
         protocol
@@ -1077,8 +1095,11 @@ pub fn cmd_show_ospf_neighbor_detail(
         xpath_nbr =
             format!("{}[neighbor-router-id='{}']", xpath_nbr, router_id);
     }
-    let data =
-        fetch_data(session, proto::get_request::DataType::All, xpath_req)?;
+    let data = fetch_data(
+        session,
+        proto::get_request::DataType::All,
+        &xpath_instance,
+    )?;
 
     // Iterate over OSPF instances.
     let output = session.writer();
@@ -1339,10 +1360,12 @@ fn ospf_hostnames(
     let data =
         fetch_data(session, proto::get_request::DataType::State, &xpath)?;
 
+    let Ok(dref) = data.find_path(&xpath) else {
+        return Ok(Default::default());
+    };
+
     // Collect hostname mappings into a binary tree.
-    let hostnames = data
-        .find_path(&xpath)
-        .unwrap()
+    let hostnames = dref
         .find_xpath("hostname")
         .unwrap()
         .filter_map(|dnode| {
@@ -1403,7 +1426,6 @@ pub fn cmd_show_rip_interface_detail(
     let name = get_opt_arg(&mut args, "name");
 
     // Fetch data.
-    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
         "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
         protocol
@@ -1416,8 +1438,11 @@ pub fn cmd_show_rip_interface_detail(
         xpath_iface = format!("{}[interface='{}']", xpath_iface, name);
     }
 
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
+    let data = fetch_data(
+        session,
+        proto::get_request::DataType::State,
+        &xpath_instance,
+    )?;
 
     // Iterate over RIP instances.
     let output = session.writer();
@@ -1500,7 +1525,6 @@ pub fn cmd_show_rip_neighbor_detail(
     let nb_address = get_opt_arg(&mut args, "address");
 
     // Fetch data.
-    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
         "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
         protocol
@@ -1513,8 +1537,11 @@ pub fn cmd_show_rip_neighbor_detail(
             format!("{}[{}='{}']", xpath_neighbor, address, nb_address);
     }
 
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
+    let data = fetch_data(
+        session,
+        proto::get_request::DataType::State,
+        &xpath_instance,
+    )?;
 
     // Iterate over RIP instances.
     let output = session.writer();
@@ -1621,7 +1648,6 @@ pub fn cmd_show_mpls_ldp_discovery_detail(
     let name = get_opt_arg(&mut args, "name");
 
     // Fetch data.
-    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
         "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
         PROTOCOL_MPLS_LDP
@@ -1636,8 +1662,11 @@ pub fn cmd_show_mpls_ldp_discovery_detail(
     // when find_xpath is invoked current node is address-families
     let xpath_adjacency = "ipv4/hello-adjacencies/hello-adjacency".to_owned();
 
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
+    let data = fetch_data(
+        session,
+        proto::get_request::DataType::State,
+        &xpath_instance,
+    )?;
 
     // Iterate over MPLS LDP instances.
     let output = session.writer();
@@ -1732,7 +1761,6 @@ pub fn cmd_show_mpls_ldp_peer_detail(
     let lsr_id = get_opt_arg(&mut args, "lsr-id");
 
     // Fetch data.
-    let xpath_req = "/ietf-routing:routing/control-plane-protocols";
     let xpath_instance = format!(
         "/ietf-routing:routing/control-plane-protocols/control-plane-protocol[type='{}']",
         PROTOCOL_MPLS_LDP
@@ -1747,8 +1775,11 @@ pub fn cmd_show_mpls_ldp_peer_detail(
 
     let xpath_capability = "capability".to_owned();
 
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
+    let data = fetch_data(
+        session,
+        proto::get_request::DataType::State,
+        &xpath_instance,
+    )?;
 
     // Iterate over MPLS LDP instances.
     let output = session.writer();
@@ -1995,6 +2026,9 @@ pub fn cmd_show_bgp_summary(
     let afi_xpath = format!("afi-safis/afi-safi[name='{}']/prefixes", afi);
 
     YangTableBuilder::new(session, proto::get_request::DataType::All)
+        .fetch_path(
+            format!("{}/{}", XPATH_PROTOCOL, XPATH_BGP_NEIGHBOR).as_str(),
+        )
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_BGP))
         .column_leaf("Instance", "name")
@@ -2135,7 +2169,7 @@ pub fn cmd_show_bgp_neighbor(
     let data =
         fetch_data(session, proto::get_request::DataType::State, &xpath_req)?;
 
-    let xpath_routes = format!("{}/route", &xpath_req);
+    let xpath_routes = format!("{}/route", xpath_req);
 
     let output = session.writer();
 
@@ -2461,12 +2495,12 @@ pub fn cmd_clear_bgp_neighbor(
             "soft-in" => "soft-inbound",
             op => op,
         };
-        let xpath = format!("{}/{}", &xpath, operation);
+        let xpath = format!("{}/{}", xpath, operation);
         clear_req.new_path(&xpath, None, false).unwrap();
     }
 
     if neighbor.is_some() {
-        let xpath = format!("{}/holo-bgp:remote-addr", &xpath);
+        let xpath = format!("{}/holo-bgp:remote-addr", xpath);
         clear_req
             .new_path(&xpath, neighbor.as_deref(), false)
             .unwrap();
