@@ -95,17 +95,35 @@ impl GrpcClient {
         }
     }
 
-    pub fn get(
+    pub fn get_config(
         &mut self,
-        data_type: proto::get_request::DataType,
         format: DataFormat,
         with_defaults: bool,
         xpath: Option<String>,
     ) -> Result<proto::data_tree::Data, Error> {
         let path = xpath.map(|x| proto::Path::from_xpath(&x));
         let data = self
-            .rpc_sync_get(proto::GetRequest {
-                r#type: data_type as i32,
+            .rpc_sync_get_config(proto::GetConfigRequest {
+                encoding: proto::Encoding::from(format) as i32,
+                with_defaults,
+                path,
+            })
+            .map_err(Error::Backend)?
+            .into_inner()
+            .data
+            .unwrap();
+        Ok(data.data.unwrap())
+    }
+
+    pub fn get_state(
+        &mut self,
+        format: DataFormat,
+        with_defaults: bool,
+        xpath: Option<String>,
+    ) -> Result<proto::data_tree::Data, Error> {
+        let path = xpath.map(|x| proto::Path::from_xpath(&x));
+        let data = self
+            .rpc_sync_get_state(proto::GetStateRequest {
                 encoding: proto::Encoding::from(format) as i32,
                 with_defaults,
                 path,
@@ -183,12 +201,20 @@ impl GrpcClient {
         self.runtime.block_on(self.client.get_schema(request))
     }
 
-    fn rpc_sync_get(
+    fn rpc_sync_get_config(
         &mut self,
-        request: proto::GetRequest,
-    ) -> Result<tonic::Response<proto::GetResponse>, tonic::Status> {
+        request: proto::GetConfigRequest,
+    ) -> Result<tonic::Response<proto::GetConfigResponse>, tonic::Status> {
         let request = tonic::Request::new(request);
-        self.runtime.block_on(self.client.get(request))
+        self.runtime.block_on(self.client.get_config(request))
+    }
+
+    fn rpc_sync_get_state(
+        &mut self,
+        request: proto::GetStateRequest,
+    ) -> Result<tonic::Response<proto::GetStateResponse>, tonic::Status> {
+        let request = tonic::Request::new(request);
+        self.runtime.block_on(self.client.get_state(request))
     }
 
     fn rpc_sync_commit(
@@ -266,7 +292,8 @@ impl proto::Path {
                     Some(pos) => {
                         let name = &segment[..pos];
                         let mut keys = HashMap::new();
-                        for kv in segment[pos..].split('[').filter(|s| !s.is_empty())
+                        for kv in
+                            segment[pos..].split('[').filter(|s| !s.is_empty())
                         {
                             let kv = kv.trim_end_matches(']');
                             if let Some(eq_pos) = kv.find('=') {

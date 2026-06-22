@@ -56,14 +56,7 @@ impl Session {
     pub fn new(use_pager: bool, mut grpc_client: GrpcClient) -> Session {
         let yang_ctx = YANG_CTX.get().unwrap();
         let data_format = DataFormat::LYB;
-        let running = grpc_client
-            .get(
-                proto::get_request::DataType::Config,
-                data_format,
-                false,
-                None,
-            )
-            .unwrap();
+        let running = grpc_client.get_config(data_format, false, None).unwrap();
         let running = DataTree::parse_string(
             yang_ctx,
             running.as_bytes().unwrap(),
@@ -308,15 +301,22 @@ impl Session {
         }
     }
 
-    pub fn get(
+    pub fn get_config(
         &mut self,
-        data_type: proto::get_request::DataType,
         format: DataFormat,
         with_defaults: bool,
         xpath: Option<String>,
     ) -> Result<proto::data_tree::Data, Error> {
-        self.grpc_client
-            .get(data_type, format, with_defaults, xpath)
+        self.grpc_client.get_config(format, with_defaults, xpath)
+    }
+
+    pub fn get_state(
+        &mut self,
+        format: DataFormat,
+        with_defaults: bool,
+        xpath: Option<String>,
+    ) -> Result<proto::data_tree::Data, Error> {
+        self.grpc_client.get_state(format, with_defaults, xpath)
     }
 
     pub fn execute(
