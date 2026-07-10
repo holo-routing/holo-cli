@@ -4,6 +4,8 @@
 // SPDX-License-Identifier: MIT
 //
 
+use std::sync::{Arc, Mutex};
+
 use derive_new::new;
 use enum_as_inner::EnumAsInner;
 use indextree::NodeId;
@@ -14,6 +16,7 @@ use yang5::schema::{SchemaNode, SchemaNodeKind};
 
 use crate::error::Error;
 use crate::grpc::{GrpcClient, proto};
+use crate::notifications::{NotificationBuffer, Subscription};
 use crate::parser::ParsedArgs;
 use crate::token::Commands;
 use crate::{YANG_CTX, token_yang};
@@ -28,6 +31,9 @@ pub struct Session {
     running: DataTree<'static>,
     candidate: Option<DataTree<'static>>,
     grpc_client: GrpcClient,
+    grpc_addr: &'static str,
+    notification_buffer: Arc<Mutex<NotificationBuffer>>,
+    subscription: Option<Subscription>,
     writer: Box<dyn std::io::Write + Send>,
 }
 
@@ -53,7 +59,11 @@ pub enum ConfigurationType {
 // ===== impl Session =====
 
 impl Session {
-    pub fn new(use_pager: bool, mut grpc_client: GrpcClient) -> Session {
+    pub fn new(
+        use_pager: bool,
+        mut grpc_client: GrpcClient,
+        grpc_addr: &'static str,
+    ) -> Session {
         let yang_ctx = YANG_CTX.get().unwrap();
         let data_format = DataFormat::LYB;
         let running = grpc_client
@@ -81,8 +91,48 @@ impl Session {
             running,
             candidate: None,
             grpc_client,
+            grpc_addr,
+            notification_buffer: Arc::new(Mutex::new(
+                NotificationBuffer::default(),
+            )),
+            subscription: None,
             writer: Box::new(std::io::stdout()),
         }
+    }
+
+    pub fn notification_start(&mut self) -> Result<(), String> {
+        if let Some(subscription) = &self.subscription {
+            if !subscription.is_finished() {
+                return Err("already subscribed to notifications".to_owned());
+            }
+            // The receiver died on its own; reap it before resubscribing.
+            self.subscription.take().unwrap().stop();
+        }
+
+        self.notification_buffer
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .set_status(None);
+        let subscription = Subscription::start(
+            self.grpc_addr,
+            Arc::clone(&self.notification_buffer),
+        )?;
+        self.subscription = Some(subscription);
+        Ok(())
+    }
+
+    pub fn notification_stop(&mut self) -> Result<(), String> {
+        match self.subscription.take() {
+            Some(subscription) => {
+                subscription.stop();
+                Ok(())
+            }
+            None => Err("not subscribed to notifications".to_owned()),
+        }
+    }
+
+    pub fn notification_buffer(&self) -> Arc<Mutex<NotificationBuffer>> {
+        Arc::clone(&self.notification_buffer)
     }
 
     pub fn update_hostname(&mut self) {

@@ -145,6 +145,9 @@ fn parse_tag_token(
         }
         "cmd_clear_isis_database" => internal_commands::cmd_clear_isis_database,
         "cmd_clear_bgp_neighbor" => internal_commands::cmd_clear_bgp_neighbor,
+        "cmd_notification_start" => internal_commands::cmd_notification_start,
+        "cmd_notification_stop" => internal_commands::cmd_notification_stop,
+        "cmd_show_notifications" => internal_commands::cmd_show_notifications,
         _ => panic!("unknown command name: {}", name),
     });
 

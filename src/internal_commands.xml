@@ -5,6 +5,10 @@
     <token name="exit" help="Exit the management session." cmd="cmd_exit_exec"/>
     <token name="end" help="Terminate configuration session." cmd="cmd_end"/>
     <token name="list" help="Print command list." cmd="cmd_list" pipe="true"/>
+    <token name="notification" help="Notification subscription management.">
+      <token name="start" help="Subscribe to YANG notifications." cmd="cmd_notification_start"/>
+      <token name="stop" help="Unsubscribe from YANG notifications." cmd="cmd_notification_stop"/>
+    </token>
     <token name="show" help="Show information about the system." pipe="true">
       <token name="running" argument="configuration" help="Show running configuration." cmd="cmd_show_config">
         <token name="format" help="Configuration format.">
@@ -32,6 +36,9 @@
       </token>
       <token name="yang" help="YANG information.">
         <token name="modules" help="Show loaded YANG modules." cmd="cmd_show_yang_modules"/>
+      </token>
+      <token name="notifications" help="Show buffered notifications." cmd="cmd_show_notifications">
+        <token name="json" argument="format" help="Raw JSON output format." cmd="cmd_show_notifications"/>
       </token>
       <!-- IS-IS show commands -->
       <token name="isis" argument="protocol" help="IS-IS information">

@@ -20,6 +20,7 @@ use yang5::schema::SchemaNodeKind;
 use crate::YANG_CTX;
 use crate::error::CallbackError;
 use crate::grpc::proto;
+use crate::notifications::NotificationEntry;
 use crate::parser::ParsedArgs;
 use crate::session::{CommandMode, ConfigurationType, Session};
 use crate::token::{Commands, TokenKind};
@@ -483,6 +484,128 @@ pub fn cmd_validate(
         Err(error) => {
             println!("% {}", error)
         }
+    }
+
+    Ok(false)
+}
+
+// ===== "notification" =====
+
+pub fn cmd_notification_start(
+    _commands: &Commands,
+    session: &mut Session,
+    _args: ParsedArgs,
+) -> Result<bool, CallbackError> {
+    match session.notification_start() {
+        Ok(()) => println!("% subscribed to notifications"),
+        Err(error) => println!("% {}", error),
+    }
+
+    Ok(false)
+}
+
+pub fn cmd_notification_stop(
+    _commands: &Commands,
+    session: &mut Session,
+    _args: ParsedArgs,
+) -> Result<bool, CallbackError> {
+    match session.notification_stop() {
+        Ok(()) => println!("% unsubscribed from notifications"),
+        Err(error) => println!("% {}", error),
+    }
+
+    Ok(false)
+}
+
+// ===== "show notifications" =====
+
+// Formats a notification as a single human-readable line by parsing its
+// JSON payload against the YANG schema and flattening all leaf values.
+fn format_notification_line(entry: &NotificationEntry) -> String {
+    let yang_ctx = YANG_CTX.get().unwrap();
+    let timestamp = DateTime::from_timestamp(entry.timestamp, 0)
+        .unwrap_or_default()
+        .with_timezone(&Local)
+        .format("%Y-%m-%d %H:%M:%S");
+
+    // Fall back to the raw JSON payload if parsing fails.
+    let Ok(tree) = DataTree::parse_op_string(
+        yang_ctx,
+        entry.data_json.as_str(),
+        DataFormat::JSON,
+        DataParserFlags::empty(),
+        DataOperation::NotificationYang,
+    ) else {
+        return format!(
+            "{} {} {}",
+            timestamp, entry.module_path, entry.data_json
+        );
+    };
+
+    let mut line = timestamp.to_string();
+
+    // Notification name.
+    match tree
+        .traverse()
+        .find(|dnode| dnode.schema().kind() == SchemaNodeKind::Notification)
+    {
+        Some(dnode) => {
+            let snode = dnode.schema();
+            write!(line, " {}:{}", snode.module().name(), snode.name())
+                .unwrap();
+        }
+        None => write!(line, " {}", entry.module_path).unwrap(),
+    }
+
+    // Leaf values, including list keys of ancestor nodes (e.g. the BGP
+    // neighbor's remote-address).
+    for dnode in tree.traverse().filter(|dnode| {
+        matches!(
+            dnode.schema().kind(),
+            SchemaNodeKind::Leaf | SchemaNodeKind::LeafList
+        )
+    }) {
+        if let Some(value) = dnode.value_canonical() {
+            let snode = dnode.schema();
+            let name = snode.name();
+            if value.contains(' ') {
+                write!(line, " {}=\"{}\"", name, value).unwrap();
+            } else {
+                write!(line, " {}={}", name, value).unwrap();
+            }
+        }
+    }
+
+    line
+}
+
+pub fn cmd_show_notifications(
+    _commands: &Commands,
+    session: &mut Session,
+    mut args: ParsedArgs,
+) -> Result<bool, CallbackError> {
+    let json = get_opt_arg(&mut args, "format").is_some();
+    let buffer = session.notification_buffer();
+    let buffer = buffer.lock().unwrap_or_else(|error| error.into_inner());
+
+    if buffer.is_empty() {
+        writeln!(session.writer(), "% no notifications received")?;
+    }
+    for entry in buffer.entries() {
+        if json {
+            let timestamp = DateTime::from_timestamp(entry.timestamp, 0)
+                .unwrap_or_default()
+                .with_timezone(&Local)
+                .format("%Y-%m-%d %H:%M:%S");
+            writeln!(session.writer(), "{} {}", timestamp, entry.module_path)?;
+            writeln!(session.writer(), "{}", entry.data_json)?;
+            writeln!(session.writer(), "!")?;
+        } else {
+            writeln!(session.writer(), "{}", format_notification_line(entry))?;
+        }
+    }
+    if let Some(status) = buffer.status() {
+        writeln!(session.writer(), "% subscription terminated: {}", status)?;
     }
 
     Ok(false)

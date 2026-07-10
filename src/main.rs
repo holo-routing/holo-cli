@@ -7,6 +7,7 @@
 mod error;
 mod grpc;
 mod internal_commands;
+mod notifications;
 mod parser;
 mod pipe;
 mod session;
@@ -41,13 +42,17 @@ pub struct Cli {
 // ===== impl Cli =====
 
 impl Cli {
-    fn new(use_pager: bool, grpc_client: GrpcClient) -> Cli {
+    fn new(
+        use_pager: bool,
+        grpc_client: GrpcClient,
+        grpc_addr: &'static str,
+    ) -> Cli {
         // Generate commands.
         let mut commands = Commands::new();
         commands.gen_cmds();
 
         // Create CLI session.
-        let session = Session::new(use_pager, grpc_client);
+        let session = Session::new(use_pager, grpc_client, grpc_addr);
 
         Cli { commands, session }
     }
@@ -266,7 +271,7 @@ fn main() {
     // Initialize CLI master structure.
     let use_pager = matches.values_of("command").is_none()
         && !matches.is_present("no-pager");
-    let mut cli = Cli::new(use_pager, grpc_client);
+    let mut cli = Cli::new(use_pager, grpc_client, grpc_addr);
 
     // Read configuration file.
     if let Some(path) = matches.value_of("file") {
