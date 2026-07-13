@@ -150,6 +150,25 @@ impl Cli {
 
 // ===== global functions =====
 
+// Compiles a YANG context that was created with `LY_CTX_EXPLICIT_COMPILE`.
+//
+// yang5 0.2 exposes neither a safe `compile()` wrapper nor a `from_raw()`
+// constructor, so the compiled schema has to be triggered through the raw
+// libyang pointer.
+fn compile_context(yang_ctx: Context) -> Context {
+    let raw = yang_ctx.into_raw();
+    let ret = unsafe { yang5::ffi::ly_ctx_compile(raw) };
+    assert_eq!(
+        ret,
+        yang5::ffi::LY_ERR::LY_SUCCESS,
+        "failed to compile YANG context"
+    );
+    // SAFETY: `Context` is a newtype wrapping exactly this `*mut ly_ctx`.
+    // Rebuilding it from the pointer returned by `into_raw()` re-establishes
+    // ownership so the context is still freed on drop.
+    unsafe { std::mem::transmute::<*mut yang5::ffi::ly_ctx, Context>(raw) }
+}
+
 fn read_config_file(mut cli: Cli, path: &str) {
     // Enter configuration mode.
     let mode = CommandMode::Configure { nodes: vec![] };
@@ -242,8 +261,19 @@ fn main() {
     };
 
     // Initialize YANG context.
+    //
+    // Defer schema compilation with `LY_CTX_EXPLICIT_COMPILE`. Without it,
+    // libyang recompiles the whole context after *every* `load_module()` call;
+    // with ~75 modules advertised by holod that quadratic cost dominates
+    // startup (~0.5 s), which is paid on every single one-shot (`-c`)
+    // invocation. Instead, load all modules first and compile the context once
+    // (see `compile_context()` after the module load below).
     let mut yang_ctx = Context::new(
-        ContextFlags::NO_YANGLIBRARY | ContextFlags::PREFER_SEARCHDIRS,
+        ContextFlags::NO_YANGLIBRARY
+            | ContextFlags::PREFER_SEARCHDIRS
+            | ContextFlags::from_bits_retain(
+                yang5::ffi::LY_CTX_EXPLICIT_COMPILE,
+            ),
     )
     .unwrap();
 
@@ -259,8 +289,13 @@ fn main() {
     // Set YANG search directory.
     yang_ctx.set_searchdir(YANG_MODULES_DIR).unwrap();
 
-    // Load YANG modules.
+    // Load YANG modules (parsed but not yet compiled, see EXPLICIT_COMPILE
+    // above).
     grpc_client.load_modules(grpc_addr, &mut yang_ctx);
+
+    // Compile the whole schema in a single pass now that every module has been
+    // loaded.
+    let yang_ctx = compile_context(yang_ctx);
     YANG_CTX.set(Arc::new(yang_ctx)).unwrap();
 
     // Initialize CLI master structure.

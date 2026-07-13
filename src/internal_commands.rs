@@ -2135,7 +2135,7 @@ pub fn cmd_show_bgp_neighbor(
     let data =
         fetch_data(session, proto::get_request::DataType::State, &xpath_req)?;
 
-    let xpath_routes = format!("{}/route", &xpath_req);
+    let xpath_routes = format!("{}/route", xpath_req);
 
     let output = session.writer();
 
@@ -2461,12 +2461,12 @@ pub fn cmd_clear_bgp_neighbor(
             "soft-in" => "soft-inbound",
             op => op,
         };
-        let xpath = format!("{}/{}", &xpath, operation);
+        let xpath = format!("{}/{}", xpath, operation);
         clear_req.new_path(&xpath, None, false).unwrap();
     }
 
     if neighbor.is_some() {
-        let xpath = format!("{}/holo-bgp:remote-addr", &xpath);
+        let xpath = format!("{}/holo-bgp:remote-addr", xpath);
         clear_req
             .new_path(&xpath, neighbor.as_deref(), false)
             .unwrap();
