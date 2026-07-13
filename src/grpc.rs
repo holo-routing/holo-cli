@@ -266,7 +266,8 @@ impl proto::Path {
                     Some(pos) => {
                         let name = &segment[..pos];
                         let mut keys = HashMap::new();
-                        for kv in segment[pos..].split('[').filter(|s| !s.is_empty())
+                        for kv in
+                            segment[pos..].split('[').filter(|s| !s.is_empty())
                         {
                             let kv = kv.trim_end_matches(']');
                             if let Some(eq_pos) = kv.find('=') {

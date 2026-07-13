@@ -31,7 +31,15 @@ const XPATH_RIB: &str = "/ietf-routing:routing/ribs/rib";
 struct YangTableBuilder<'a> {
     session: &'a mut Session,
     data_type: proto::get_request::DataType,
-    paths: Vec<(String, Vec<YangTableColumn>)>,
+    paths: Vec<YangTablePath>,
+}
+
+struct YangTablePath {
+    xpath: String,
+    // When true, a missing instance of this path (and any deeper ones) doesn't
+    // suppress the row; the corresponding columns are filled with "-" instead.
+    optional: bool,
+    columns: Vec<YangTableColumn>,
 }
 
 struct YangTableColumn {
@@ -67,7 +75,23 @@ impl<'a> YangTableBuilder<'a> {
 
     // Adds an XPath to the builder.
     pub fn xpath(mut self, xpath: &'a str) -> Self {
-        self.paths.push((xpath.to_owned(), Vec::new()));
+        self.paths.push(YangTablePath {
+            xpath: xpath.to_owned(),
+            optional: false,
+            columns: Vec::new(),
+        });
+        self
+    }
+
+    // Marks the last added XPath as optional.
+    //
+    // When the data tree has no instance of an optional path (for example a
+    // directly-connected route that has no resolved next hop), the row is still
+    // emitted with "-" placeholders instead of being dropped entirely.
+    pub fn optional(mut self) -> Self {
+        if let Some(path) = self.paths.last_mut() {
+            path.optional = true;
+        }
         self
     }
 
@@ -77,9 +101,10 @@ impl<'a> YangTableBuilder<'a> {
         S: AsRef<str>,
     {
         if let Some(value) = value
-            && let Some((xpath, _)) = self.paths.last_mut()
+            && let Some(path) = self.paths.last_mut()
         {
-            *xpath = format!("{}[{}='{}']", xpath, key, value.as_ref());
+            path.xpath =
+                format!("{}[{}='{}']", path.xpath, key, value.as_ref());
         }
         self
     }
@@ -90,8 +115,8 @@ impl<'a> YangTableBuilder<'a> {
         title: &'static str,
         name: &'static str,
     ) -> Self {
-        if let Some((_, columns)) = self.paths.last_mut() {
-            columns.push(YangTableColumn {
+        if let Some(path) = self.paths.last_mut() {
+            path.columns.push(YangTableColumn {
                 title,
                 value: YangTableValue::Leaf(name, YangValueDisplayFormat::Raw),
             });
@@ -108,8 +133,8 @@ impl<'a> YangTableBuilder<'a> {
         title: &'static str,
         name: &'static str,
     ) -> Self {
-        if let Some((_, columns)) = self.paths.last_mut() {
-            columns.push(YangTableColumn {
+        if let Some(path) = self.paths.last_mut() {
+            path.columns.push(YangTableColumn {
                 title,
                 value: YangTableValue::Leaf(
                     name,
@@ -129,8 +154,8 @@ impl<'a> YangTableBuilder<'a> {
         title: &'static str,
         name: &'static str,
     ) -> Self {
-        if let Some((_, columns)) = self.paths.last_mut() {
-            columns.push(YangTableColumn {
+        if let Some(path) = self.paths.last_mut() {
+            path.columns.push(YangTableColumn {
                 title,
                 value: YangTableValue::Leaf(
                     name,
@@ -146,8 +171,8 @@ impl<'a> YangTableBuilder<'a> {
         title: &'static str,
         cb: Box<dyn Fn(&DataNodeRef<'_>) -> String>,
     ) -> Self {
-        if let Some((_, columns)) = self.paths.last_mut() {
-            columns.push(YangTableColumn {
+        if let Some(path) = self.paths.last_mut() {
+            path.columns.push(YangTableColumn {
                 title,
                 value: YangTableValue::Fn(cb),
             });
@@ -160,16 +185,18 @@ impl<'a> YangTableBuilder<'a> {
     fn show_path(
         table: &mut Table,
         dnode: DataNodeRef<'_>,
-        paths: &[(String, Vec<YangTableColumn>)],
+        paths: &[YangTablePath],
         values: Vec<String>,
     ) {
-        let Some((xpath, columns)) = paths.first() else {
+        let Some(path) = paths.first() else {
             return;
         };
 
-        for dnode in dnode.find_xpath(xpath).unwrap() {
+        let mut matched = false;
+        for dnode in dnode.find_xpath(&path.xpath).unwrap() {
+            matched = true;
             let mut values = values.clone();
-            for column in columns {
+            for column in &path.columns {
                 let value = match &column.value {
                     YangTableValue::Leaf(name, format) => {
                         let value = dnode.child_value(name);
@@ -195,6 +222,20 @@ impl<'a> YangTableBuilder<'a> {
                 Self::show_path(table, dnode, &paths[1..], values);
             }
         }
+
+        // When an optional path has no matching instance (e.g. a
+        // directly-connected route with no resolved next hop), still emit a row
+        // rather than dropping it, filling this path's columns and any deeper
+        // ones with "-" placeholders.
+        if !matched && path.optional {
+            let mut values = values;
+            for path in paths {
+                for _ in &path.columns {
+                    values.push("-".to_owned());
+                }
+            }
+            table.add_row(values.into());
+        }
     }
 
     // Builds and displays the table.
@@ -213,7 +254,7 @@ impl<'a> YangTableBuilder<'a> {
         let column_titles: Vec<_> = self
             .paths
             .iter()
-            .flat_map(|(_, columns)| columns.iter())
+            .flat_map(|path| path.columns.iter())
             .map(|column| column.title)
             .collect();
         table.set_titles(column_titles.into());
@@ -801,6 +842,7 @@ pub fn cmd_show_isis_route(
         .column_leaf("Metric", "metric")
         .column_leaf("Level", "level")
         .xpath(XPATH_ISIS_NEXTHOP)
+        .optional()
         .column_leaf("Nexthop Interface", "outgoing-interface")
         .column_leaf("Nexthop Address", "next-hop")
         .show()?;
@@ -821,18 +863,27 @@ fn isis_hostnames(
         fetch_data(session, proto::get_request::DataType::State, &xpath)?;
 
     // Collect hostname mappings into a binary tree.
-    let hostnames = data
-        .find_path(&xpath)
-        .unwrap()
-        .find_xpath("hostname")
-        .unwrap()
-        .filter_map(|dnode| {
-            Some((
-                dnode.child_opt_value("system-id")?,
-                dnode.child_opt_value("hostname")?,
-            ))
-        })
-        .collect();
+    //
+    // The `hostnames` container is absent whenever the IS-IS instance isn't
+    // configured or hasn't learned any dynamic hostname yet, in which case
+    // `find_path` returns a "not found" error. Treat that as an empty mapping
+    // instead of panicking so that `show isis adjacency` still lists the raw
+    // system IDs.
+    let hostnames = match data.find_path(&xpath) {
+        Ok(dnode) => dnode
+            .find_xpath("hostname")
+            .map(|set| {
+                set.filter_map(|dnode| {
+                    Some((
+                        dnode.child_opt_value("system-id")?,
+                        dnode.child_opt_value("hostname")?,
+                    ))
+                })
+                .collect()
+            })
+            .unwrap_or_default(),
+        Err(_) => BTreeMap::new(),
+    };
 
     Ok(hostnames)
 }
@@ -1296,6 +1347,7 @@ pub fn cmd_show_ospf_route(
         .column_leaf("Type", "route-type")
         .column_leaf("Tag", "route-tag")
         .xpath(XPATH_OSPF_NEXTHOP)
+        .optional()
         .column_leaf("Nexthop Interface", "outgoing-interface")
         .column_leaf("Nexthop Address", "next-hop")
         .show()?;
@@ -1340,18 +1392,26 @@ fn ospf_hostnames(
         fetch_data(session, proto::get_request::DataType::State, &xpath)?;
 
     // Collect hostname mappings into a binary tree.
-    let hostnames = data
-        .find_path(&xpath)
-        .unwrap()
-        .find_xpath("hostname")
-        .unwrap()
-        .filter_map(|dnode| {
-            Some((
-                dnode.child_opt_value("router-id")?,
-                dnode.child_opt_value("hostname")?,
-            ))
-        })
-        .collect();
+    //
+    // The `hostnames` container is absent whenever the OSPF instance isn't
+    // configured or hasn't learned any dynamic hostname yet, in which case
+    // `find_path` returns a "not found" error. Treat that as an empty mapping
+    // instead of panicking so that neighbor/route output still renders.
+    let hostnames = match data.find_path(&xpath) {
+        Ok(dnode) => dnode
+            .find_xpath("hostname")
+            .map(|set| {
+                set.filter_map(|dnode| {
+                    Some((
+                        dnode.child_opt_value("router-id")?,
+                        dnode.child_opt_value("hostname")?,
+                    ))
+                })
+                .collect()
+            })
+            .unwrap_or_default(),
+        Err(_) => BTreeMap::new(),
+    };
 
     Ok(hostnames)
 }
@@ -2135,7 +2195,7 @@ pub fn cmd_show_bgp_neighbor(
     let data =
         fetch_data(session, proto::get_request::DataType::State, &xpath_req)?;
 
-    let xpath_routes = format!("{}/route", &xpath_req);
+    let xpath_routes = format!("{}/route", xpath_req);
 
     let output = session.writer();
 
@@ -2461,12 +2521,12 @@ pub fn cmd_clear_bgp_neighbor(
             "soft-in" => "soft-inbound",
             op => op,
         };
-        let xpath = format!("{}/{}", &xpath, operation);
+        let xpath = format!("{}/{}", xpath, operation);
         clear_req.new_path(&xpath, None, false).unwrap();
     }
 
     if neighbor.is_some() {
-        let xpath = format!("{}/holo-bgp:remote-addr", &xpath);
+        let xpath = format!("{}/holo-bgp:remote-addr", xpath);
         clear_req
             .new_path(&xpath, neighbor.as_deref(), false)
             .unwrap();
