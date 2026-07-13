@@ -10,7 +10,8 @@ use std::os::raw::{c_char, c_void};
 
 use proto::northbound_client::NorthboundClient;
 use yang5::data::{
-    Data, DataDiffFlags, DataFormat, DataPrinterFlags, DataTree,
+    Data, DataDiffFlags, DataFormat, DataParserFlags, DataPrinterFlags,
+    DataTree, DataValidationFlags,
 };
 use yang5::ffi;
 
@@ -102,19 +103,98 @@ impl GrpcClient {
         with_defaults: bool,
         xpath: Option<String>,
     ) -> Result<proto::data_tree::Data, Error> {
+        use proto::get_request::DataType;
+
+        // holod (>= the "separate state and configuration retrieval" change)
+        // replaced the combined `Get` RPC with dedicated `GetConfig` and
+        // `GetState` RPCs. Dispatch accordingly, reassembling the `ALL` union
+        // by merging both data trees.
         let path = xpath.map(|x| proto::Path::from_xpath(&x));
-        let data = self
-            .rpc_sync_get(proto::GetRequest {
-                r#type: data_type as i32,
-                encoding: proto::Encoding::from(format) as i32,
-                with_defaults,
-                path,
-            })
-            .map_err(Error::Backend)?
-            .into_inner()
-            .data
-            .unwrap();
-        Ok(data.data.unwrap())
+        let encoding = proto::Encoding::from(format) as i32;
+
+        match data_type {
+            DataType::Config => {
+                let data = self
+                    .rpc_sync_get_config(proto::GetConfigRequest {
+                        encoding,
+                        with_defaults,
+                        path,
+                    })
+                    .map_err(Error::Backend)?
+                    .into_inner()
+                    .data
+                    .unwrap();
+                Ok(data.data.unwrap())
+            }
+            DataType::State => {
+                let data = self
+                    .rpc_sync_get_state(proto::GetStateRequest {
+                        encoding,
+                        with_defaults,
+                        path,
+                    })
+                    .map_err(Error::Backend)?
+                    .into_inner()
+                    .data
+                    .unwrap();
+                Ok(data.data.unwrap())
+            }
+            DataType::All => {
+                let config = self
+                    .rpc_sync_get_config(proto::GetConfigRequest {
+                        encoding,
+                        with_defaults,
+                        path: path.clone(),
+                    })
+                    .map_err(Error::Backend)?
+                    .into_inner()
+                    .data
+                    .unwrap()
+                    .data
+                    .unwrap();
+                let state = self
+                    .rpc_sync_get_state(proto::GetStateRequest {
+                        encoding,
+                        with_defaults,
+                        path,
+                    })
+                    .map_err(Error::Backend)?
+                    .into_inner()
+                    .data
+                    .unwrap()
+                    .data
+                    .unwrap();
+
+                let yang_ctx = crate::YANG_CTX.get().unwrap();
+                let mut tree = Self::parse_data(yang_ctx, &config, format);
+                let state_tree = Self::parse_data(yang_ctx, &state, format);
+                tree.merge(&state_tree)
+                    .expect("Failed to merge config and state data trees");
+                Ok(proto::DataTree::new(format, &tree).data.unwrap())
+            }
+        }
+    }
+
+    // Parses a `data_tree::Data` payload (as returned by GetConfig/GetState)
+    // back into a YANG data tree so that the `ALL` union can be reassembled.
+    fn parse_data<'a>(
+        yang_ctx: &'a std::sync::Arc<yang5::context::Context>,
+        data: &proto::data_tree::Data,
+        format: DataFormat,
+    ) -> DataTree<'a> {
+        let (string, bytes) = match data {
+            proto::data_tree::Data::DataString(s) => (s.as_str(), None),
+            proto::data_tree::Data::DataBytes(b) => ("", Some(b.as_slice())),
+        };
+        let input = bytes.unwrap_or(string.as_bytes());
+        DataTree::parse_string(
+            yang_ctx,
+            input,
+            format,
+            DataParserFlags::NO_VALIDATION,
+            DataValidationFlags::PRESENT,
+        )
+        .expect("Failed to parse data tree")
     }
 
     pub fn validate_candidate(
@@ -183,12 +263,20 @@ impl GrpcClient {
         self.runtime.block_on(self.client.get_schema(request))
     }
 
-    fn rpc_sync_get(
+    fn rpc_sync_get_state(
         &mut self,
-        request: proto::GetRequest,
-    ) -> Result<tonic::Response<proto::GetResponse>, tonic::Status> {
+        request: proto::GetStateRequest,
+    ) -> Result<tonic::Response<proto::GetStateResponse>, tonic::Status> {
         let request = tonic::Request::new(request);
-        self.runtime.block_on(self.client.get(request))
+        self.runtime.block_on(self.client.get_state(request))
+    }
+
+    fn rpc_sync_get_config(
+        &mut self,
+        request: proto::GetConfigRequest,
+    ) -> Result<tonic::Response<proto::GetConfigResponse>, tonic::Status> {
+        let request = tonic::Request::new(request);
+        self.runtime.block_on(self.client.get_config(request))
     }
 
     fn rpc_sync_commit(
@@ -266,7 +354,8 @@ impl proto::Path {
                     Some(pos) => {
                         let name = &segment[..pos];
                         let mut keys = HashMap::new();
-                        for kv in segment[pos..].split('[').filter(|s| !s.is_empty())
+                        for kv in
+                            segment[pos..].split('[').filter(|s| !s.is_empty())
                         {
                             let kv = kv.trim_end_matches(']');
                             if let Some(eq_pos) = kv.find('=') {

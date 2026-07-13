@@ -32,8 +32,11 @@ service Northbound {
   // Retrieve the specified schema data from the target.
   rpc GetSchema(GetSchemaRequest) returns (GetSchemaResponse) {}
 
-  // Retrieve configuration data, state data or both from the target.
-  rpc Get(GetRequest) returns (GetResponse) {}
+  // Retrieve state data from the target.
+  rpc GetState(GetStateRequest) returns (GetStateResponse) {}
+
+  // Retrieve configuration data from the target.
+  rpc GetConfig(GetConfigRequest) returns (GetConfigResponse) {}
 
   // Validate the configuration without committing it.
   rpc Validate(ValidateRequest) returns (ValidateResponse) {}
@@ -134,15 +137,47 @@ message GetRequest {
   Path path = 4;
 }
 
-message GetResponse {
-  // Return values:
-  // - grpc::StatusCode::OK: Success.
-  // - grpc::StatusCode::INVALID_ARGUMENT: Invalid YANG data path.
+//
+// RPC: GetState()
+//
+message GetStateRequest {
+  // Encoding to be used.
+  Encoding encoding = 1;
 
+  // Include implicit default nodes.
+  bool with_defaults = 2;
+
+  // Target YANG path.
+  Path path = 3;
+}
+
+message GetStateResponse {
   // Timestamp in nanoseconds since Epoch.
   int64 timestamp = 1;
 
-  // The requested data.
+  // The requested state data.
+  DataTree data = 2;
+}
+
+//
+// RPC: GetConfig()
+//
+message GetConfigRequest {
+  // Encoding to be used.
+  Encoding encoding = 1;
+
+  // Include implicit default nodes.
+  bool with_defaults = 2;
+
+  // Target YANG path.
+  Path path = 3;
+}
+
+message GetConfigResponse {
+  // Timestamp in nanoseconds since Epoch.
+  int64 timestamp = 1;
+
+  // The requested configuration data.
   DataTree data = 2;
 }
 
