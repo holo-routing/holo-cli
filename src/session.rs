@@ -7,6 +7,7 @@
 use derive_new::new;
 use enum_as_inner::EnumAsInner;
 use indextree::NodeId;
+use sha_crypt::{PasswordHasher, ShaCrypt};
 use yang5::data::{Data, DataTree, DataValidationFlags};
 use yang5::schema::{SchemaNode, SchemaNodeKind};
 
@@ -152,7 +153,7 @@ impl Session {
         negate: bool,
         snode: &SchemaNode<'_>,
         mut args: ParsedArgs,
-    ) -> Result<(), yang5::Error> {
+    ) -> Result<(), Error> {
         // Get data path and CLI path corresponding to the current node.
         let mut path = self.mode.data_path().unwrap_or_default();
         let mut cli_path = self.mode.cli_path().unwrap_or_default();
@@ -223,14 +224,23 @@ impl Session {
         // Ensure all arguments were processed.
         assert_eq!(args.len(), 0);
 
+        // Hash passwords before they reach the candidate configuration, since
+        // the daemon only accepts hashed values.
+        let value = match value {
+            Some(value) => Some(hash_password(snode, value)?),
+            None => None,
+        };
+
         // Edit the candidate configuration.
         let candidate = self.candidate.as_mut().unwrap();
         if negate {
             if candidate.find_path(&path).is_ok() {
-                candidate.remove(&path)?;
+                candidate.remove(&path).map_err(Error::EditConfig)?;
             }
         } else {
-            candidate.new_path(&path, value.as_deref(), false)?;
+            candidate
+                .new_path(&path, value.as_deref(), false)
+                .map_err(Error::EditConfig)?;
         }
 
         Ok(())
@@ -345,4 +355,41 @@ impl CommandMode {
             }
         }
     }
+}
+
+// ===== global functions =====
+
+// Hashes a cleartext password, leaving values already in one of the crypt(3)
+// forms of RFC 7317 untouched.
+fn hash_password(
+    snode: &SchemaNode<'_>,
+    value: String,
+) -> Result<String, Error> {
+    const CRYPT_HASH_TYPEDEF: &str = "crypt-hash";
+    const CRYPT_HASH_PREFIXES: [&str; 4] = ["$0$", "$1$", "$5$", "$6$"];
+
+    if !snode
+        .leaf_type()
+        .and_then(|ltype| ltype.typedef_name())
+        .is_some_and(|typedef| typedef == CRYPT_HASH_TYPEDEF)
+    {
+        return Ok(value);
+    }
+    if CRYPT_HASH_PREFIXES
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
+    {
+        return Ok(value);
+    }
+
+    // The salt is base64-encoded before it reaches the hash, so 12 bytes
+    // produce the 16 characters that RFC 7317 allows at most.
+    let mut salt = [0u8; 12];
+    getrandom::fill(&mut salt)
+        .map_err(|error| Error::HashPassword(error.to_string()))?;
+
+    ShaCrypt::default()
+        .hash_password_with_salt(value.as_bytes(), &salt)
+        .map(|hash| hash.as_str().to_owned())
+        .map_err(|error| Error::HashPassword(error.to_string()))
 }

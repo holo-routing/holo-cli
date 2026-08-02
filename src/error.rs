@@ -12,6 +12,7 @@ use crate::pipe::PipeError;
 pub enum Error {
     Parser(ParserError),
     EditConfig(yang5::Error),
+    HashPassword(String),
     ValidateConfig(yang5::Error),
     Callback(CallbackError),
     Backend(tonic::Status),
@@ -40,6 +41,9 @@ impl std::fmt::Display for Error {
             Error::Parser(error) => write!(f, "{}", error),
             Error::EditConfig(error) => {
                 write!(f, "failed to edit configuration: {}", error)
+            }
+            Error::HashPassword(error) => {
+                write!(f, "failed to hash the password: {}", error)
             }
             Error::ValidateConfig(error) => {
                 write!(f, "failed to validate configuration: {}", error)

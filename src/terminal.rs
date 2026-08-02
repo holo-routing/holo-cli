@@ -5,8 +5,11 @@
 //
 
 use std::borrow::Cow;
+use std::io::Write;
 use std::sync::{Arc, Mutex};
 
+use crossterm::event::{self, Event, KeyEventKind};
+use crossterm::terminal;
 use indextree::NodeId;
 use itertools::Itertools;
 use reedline::{
@@ -164,6 +167,19 @@ impl Completer for CliCompleter {
 }
 
 // ===== global functions =====
+
+// Reads a password from the terminal without echoing it.
+pub fn read_password() -> std::io::Result<String> {
+    print!("Password: ");
+    std::io::stdout().flush()?;
+
+    terminal::enable_raw_mode()?;
+    let password = read_password_raw();
+    terminal::disable_raw_mode()?;
+    println!();
+
+    password
+}
 
 pub fn reedline_init(
     cli: Arc<Mutex<Cli>>,
@@ -344,4 +360,37 @@ fn complete_add_tokens(
         })
         .sorted()
         .collect()
+}
+
+// Collects the password keystroke by keystroke, with the terminal in raw mode.
+fn read_password_raw() -> std::io::Result<String> {
+    let mut password = String::new();
+
+    loop {
+        let Event::Key(key) = event::read()? else {
+            continue;
+        };
+        if key.kind != KeyEventKind::Press {
+            continue;
+        }
+
+        match key.code {
+            KeyCode::Enter => break,
+            KeyCode::Backspace => {
+                password.pop();
+            }
+            KeyCode::Char('c' | 'd')
+                if key.modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "interrupted",
+                ));
+            }
+            KeyCode::Char(c) => password.push(c),
+            _ => {}
+        }
+    }
+
+    Ok(password)
 }

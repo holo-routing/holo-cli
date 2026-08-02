@@ -8,7 +8,14 @@ use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 
+use hyper_util::rt::TokioIo;
 use proto::northbound_client::NorthboundClient;
+use tokio::net::UnixStream;
+use tonic::metadata::{Ascii, MetadataValue};
+use tonic::service::Interceptor;
+use tonic::service::interceptor::InterceptedService;
+use tonic::transport::{Channel, Endpoint, Uri};
+use tower::service_fn;
 use yang5::data::{
     Data, DataDiffFlags, DataFormat, DataParserFlags, DataPrinterFlags,
     DataTree, DataValidationFlags,
@@ -30,27 +37,92 @@ type StdError = Box<dyn std::error::Error + Send + Sync + 'static>;
 // fields in declaration order.
 #[derive(Debug)]
 pub struct GrpcClient {
-    client: NorthboundClient<tonic::transport::Channel>,
+    client: NorthboundClient<InterceptedService<Channel, Credentials>>,
     runtime: tokio::runtime::Runtime,
+    credentials: Credentials,
+}
+
+// Credentials sent to the daemon with every request.
+//
+// Both are absent when the daemon has no users configured.
+#[derive(Clone, Debug, Default)]
+pub struct Credentials {
+    username: Option<MetadataValue<Ascii>>,
+    password: Option<MetadataValue<Ascii>>,
+}
+
+// ===== impl Credentials =====
+
+impl Credentials {
+    pub fn new(
+        username: Option<&str>,
+        password: Option<&str>,
+    ) -> Result<Credentials, StdError> {
+        Ok(Credentials {
+            username: username
+                .map(MetadataValue::<Ascii>::try_from)
+                .transpose()?,
+            password: password
+                .map(MetadataValue::<Ascii>::try_from)
+                .transpose()?,
+        })
+    }
+}
+
+impl Interceptor for Credentials {
+    fn call(
+        &mut self,
+        mut request: tonic::Request<()>,
+    ) -> Result<tonic::Request<()>, tonic::Status> {
+        if let Some(username) = &self.username {
+            request.metadata_mut().insert("username", username.clone());
+        }
+        if let Some(password) = &self.password {
+            request.metadata_mut().insert("password", password.clone());
+        }
+
+        Ok(request)
+    }
 }
 
 // ===== impl GrpcClient =====
 
 impl GrpcClient {
-    pub fn connect(dest: &'static str) -> Result<Self, StdError> {
+    pub fn connect(
+        dest: &'static str,
+        credentials: Credentials,
+    ) -> Result<Self, StdError> {
         // Initialize tokio runtime.
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("Failed to obtain a new runtime object");
 
-        // Connect to holod.
-        let client = runtime
-            .block_on(NorthboundClient::connect(dest))?
-            .max_encoding_message_size(usize::MAX)
-            .max_decoding_message_size(usize::MAX);
+        // Connect to holod, over a Unix socket when the destination is a path.
+        let channel = match dest.starts_with('/') {
+            true => runtime.block_on(
+                // The URI is required by the endpoint builder but goes unused,
+                // since the connector below decides where to connect.
+                Endpoint::try_from("http://[::]:50051")?
+                    .connect_with_connector(service_fn(
+                        move |_: Uri| async move {
+                            let stream = UnixStream::connect(dest).await?;
+                            Ok::<_, std::io::Error>(TokioIo::new(stream))
+                        },
+                    )),
+            )?,
+            false => runtime.block_on(Endpoint::try_from(dest)?.connect())?,
+        };
+        let client =
+            NorthboundClient::with_interceptor(channel, credentials.clone())
+                .max_encoding_message_size(usize::MAX)
+                .max_decoding_message_size(usize::MAX);
 
-        Ok(GrpcClient { client, runtime })
+        Ok(GrpcClient {
+            client,
+            runtime,
+            credentials,
+        })
     }
 
     pub fn load_modules(
@@ -65,7 +137,8 @@ impl GrpcClient {
 
         // Establish a separate connection to holod for libyang to fetch any
         // missing YANG modules or submodules using the `GetSchema` RPC.
-        let client = Self::connect(dest).expect("Connection to holod failed");
+        let client = Self::connect(dest, self.credentials.clone())
+            .expect("Connection to holod failed");
         unsafe {
             yang_ctx.set_module_import_callback(
                 ly_module_import_cb,

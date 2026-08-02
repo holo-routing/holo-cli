@@ -22,7 +22,7 @@ use reedline::Signal;
 use yang5::context::{Context, ContextFlags};
 
 use crate::error::{CallbackError, Error};
-use crate::grpc::GrpcClient;
+use crate::grpc::{Credentials, GrpcClient};
 use crate::session::{CommandMode, Session};
 use crate::terminal::CliPrompt;
 use crate::token::{Action, Commands, is_pipeable};
@@ -92,9 +92,7 @@ impl Cli {
                 Action::ConfigEdit(snode) => {
                     // Edit configuration & update CLI node if
                     // necessary.
-                    self.session
-                        .edit_candidate(negate, snode, args)
-                        .map_err(Error::EditConfig)?;
+                    self.session.edit_candidate(negate, snode, args)?;
                 }
                 Action::Callback(callback) => {
                     // Set up output: pipe chain (with
@@ -211,7 +209,26 @@ fn main() {
                 .short("a")
                 .long("address")
                 .value_name("ADDRESS")
-                .help("Holo daemon IPv4/6 address: http://IP:Port")
+                .help(
+                    "Holo daemon Unix socket path, or IPv4/6 address: \
+                     http://IP:Port",
+                )
+                .multiple(false),
+        )
+        .arg(
+            Arg::with_name("user")
+                .short("u")
+                .long("user")
+                .value_name("USER")
+                .help("User to authenticate as")
+                .multiple(false),
+        )
+        .arg(
+            Arg::with_name("password")
+                .short("p")
+                .long("password")
+                .value_name("PASSWORD")
+                .help("Password to authenticate with (prompted for if omitted)")
                 .multiple(false),
         )
         .get_matches();
@@ -219,11 +236,13 @@ fn main() {
     // Connect to the daemon.
     let raw_addr = matches
         .value_of("address")
-        .unwrap_or("127.0.0.1:50051") // no http:// in default
+        .unwrap_or("/var/opt/holo/holod.sock")
         .to_string();
 
-    // Prepend http:// if not already present
-    let addr = if raw_addr.starts_with("http://")
+    // Prepend http:// if not already present. Unix socket paths are left
+    // alone, as they aren't URIs.
+    let addr = if raw_addr.starts_with('/')
+        || raw_addr.starts_with("http://")
         || raw_addr.starts_with("https://")
     {
         raw_addr
@@ -231,8 +250,29 @@ fn main() {
         format!("http://{}", raw_addr)
     };
 
+    // Gather the credentials to authenticate with. The daemon only requires
+    // them once it has users configured.
+    let user = matches.value_of("user");
+    let password = match (user, matches.value_of("password")) {
+        (Some(_), None) => match terminal::read_password() {
+            Ok(password) => Some(password),
+            Err(error) => {
+                eprintln!("Failed to read the password: {}", error);
+                std::process::exit(1);
+            }
+        },
+        (_, password) => password.map(str::to_owned),
+    };
+    let credentials = match Credentials::new(user, password.as_deref()) {
+        Ok(credentials) => credentials,
+        Err(error) => {
+            eprintln!("Invalid credentials: {}", error);
+            std::process::exit(1);
+        }
+    };
+
     let grpc_addr: &'static str = Box::leak(addr.into_boxed_str());
-    let mut grpc_client = match GrpcClient::connect(grpc_addr) {
+    let mut grpc_client = match GrpcClient::connect(grpc_addr, credentials) {
         Ok(grpc_client) => grpc_client,
         Err(error) => {
             eprintln!("Connection to holod failed: {}\n", error);
