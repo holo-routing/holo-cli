@@ -15,6 +15,7 @@ pub enum Error {
     ValidateConfig(yang5::Error),
     Callback(CallbackError),
     Backend(tonic::Status),
+    Data(yang5::Error),
     Pipe(PipeError),
 }
 
@@ -48,6 +49,9 @@ impl std::fmt::Display for Error {
             }
             Error::Backend(error) => {
                 write!(f, "{}", error)
+            }
+            Error::Data(error) => {
+                write!(f, "failed to process retrieved data: {}", error)
             }
             Error::Pipe(error) => {
                 write!(f, "{}", error)

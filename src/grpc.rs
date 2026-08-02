@@ -10,12 +10,13 @@ use std::os::raw::{c_char, c_void};
 
 use proto::northbound_client::NorthboundClient;
 use yang5::data::{
-    Data, DataDiffFlags, DataFormat, DataPrinterFlags, DataTree,
+    Data, DataDiffFlags, DataFormat, DataParserFlags, DataPrinterFlags,
+    DataTree, DataValidationFlags,
 };
 use yang5::ffi;
 
-use crate::YANG_MODULES_DIR;
 use crate::error::Error;
+use crate::{YANG_CTX, YANG_MODULES_DIR};
 
 pub mod proto {
     tonic::include_proto!("holo");
@@ -95,26 +96,46 @@ impl GrpcClient {
         }
     }
 
-    pub fn get(
+    pub fn get_config(
         &mut self,
-        data_type: proto::get_request::DataType,
-        format: DataFormat,
         with_defaults: bool,
         xpath: Option<String>,
-    ) -> Result<proto::data_tree::Data, Error> {
+    ) -> Result<DataTree<'static>, Error> {
         let path = xpath.map(|x| proto::Path::from_xpath(&x));
-        let data = self
-            .rpc_sync_get(proto::GetRequest {
-                r#type: data_type as i32,
-                encoding: proto::Encoding::from(format) as i32,
+        let response = self
+            .rpc_sync_get_config(proto::GetConfigRequest {
+                encoding: proto::Encoding::Lyb as i32,
                 with_defaults,
                 path,
             })
             .map_err(Error::Backend)?
-            .into_inner()
-            .data
-            .unwrap();
-        Ok(data.data.unwrap())
+            .into_inner();
+        data_tree_parse(
+            response.data.as_ref(),
+            DataParserFlags::empty(),
+            DataValidationFlags::PRESENT | DataValidationFlags::NO_STATE,
+        )
+    }
+
+    pub fn get_state(
+        &mut self,
+        with_defaults: bool,
+        xpath: Option<String>,
+    ) -> Result<DataTree<'static>, Error> {
+        let path = xpath.map(|x| proto::Path::from_xpath(&x));
+        let response = self
+            .rpc_sync_get_state(proto::GetStateRequest {
+                encoding: proto::Encoding::Lyb as i32,
+                with_defaults,
+                path,
+            })
+            .map_err(Error::Backend)?
+            .into_inner();
+        data_tree_parse(
+            response.data.as_ref(),
+            DataParserFlags::NO_VALIDATION,
+            DataValidationFlags::PRESENT,
+        )
     }
 
     pub fn validate_candidate(
@@ -183,12 +204,20 @@ impl GrpcClient {
         self.runtime.block_on(self.client.get_schema(request))
     }
 
-    fn rpc_sync_get(
+    fn rpc_sync_get_config(
         &mut self,
-        request: proto::GetRequest,
-    ) -> Result<tonic::Response<proto::GetResponse>, tonic::Status> {
+        request: proto::GetConfigRequest,
+    ) -> Result<tonic::Response<proto::GetConfigResponse>, tonic::Status> {
         let request = tonic::Request::new(request);
-        self.runtime.block_on(self.client.get(request))
+        self.runtime.block_on(self.client.get_config(request))
+    }
+
+    fn rpc_sync_get_state(
+        &mut self,
+        request: proto::GetStateRequest,
+    ) -> Result<tonic::Response<proto::GetStateResponse>, tonic::Status> {
+        let request = tonic::Request::new(request);
+        self.runtime.block_on(self.client.get_state(request))
     }
 
     fn rpc_sync_commit(
@@ -213,18 +242,6 @@ impl GrpcClient {
     ) -> Result<tonic::Response<proto::ExecuteResponse>, tonic::Status> {
         let request = tonic::Request::new(request);
         self.runtime.block_on(self.client.execute(request))
-    }
-}
-
-// ===== impl proto::data_tree::Data =====
-
-impl proto::data_tree::Data {
-    pub fn as_bytes(&self) -> Option<&::prost::alloc::vec::Vec<u8>> {
-        if let proto::data_tree::Data::DataBytes(b) = &self {
-            Some(b)
-        } else {
-            None
-        }
     }
 }
 
@@ -304,6 +321,28 @@ impl From<DataFormat> for proto::Encoding {
 }
 
 // ===== helper functions =====
+
+// Parses a data tree received from the daemon in the LYB format.
+fn data_tree_parse(
+    data_tree: Option<&proto::DataTree>,
+    parser_flags: DataParserFlags,
+    validation_flags: DataValidationFlags,
+) -> Result<DataTree<'static>, Error> {
+    let yang_ctx = YANG_CTX.get().unwrap();
+    let data = match data_tree.and_then(|data_tree| data_tree.data.as_ref()) {
+        Some(proto::data_tree::Data::DataBytes(data)) => data.as_slice(),
+        Some(proto::data_tree::Data::DataString(data)) => data.as_bytes(),
+        None => return Ok(DataTree::new(yang_ctx)),
+    };
+    DataTree::parse_string(
+        yang_ctx,
+        data,
+        DataFormat::LYB,
+        parser_flags,
+        validation_flags,
+    )
+    .map_err(Error::Data)
+}
 
 unsafe extern "C" fn ly_module_import_cb(
     module_name: *const c_char,

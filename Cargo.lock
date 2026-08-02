@@ -2029,9 +2029,9 @@ checksum = "a62ce76d9b56901b19a74f19431b0d8b3bc7ca4ad685a746dfd78ca8f4fc6bda"
 
 [[package]]
 name = "yang5"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e5ebbf669599b5c407efa54e675230eb61d963a3d7452ddea205b6819a24064"
+checksum = "1da35149085196bd35c11637c084c0723157c05d97766033cec6d90db535bd19"
 dependencies = [
  "bitflags 2.9.0",
  "libc",

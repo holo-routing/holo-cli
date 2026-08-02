@@ -13,13 +13,12 @@ use prettytable::{Table, format, row};
 use similar::TextDiff;
 use yang5::data::{
     Data, DataFormat, DataNodeRef, DataOperation, DataParserFlags,
-    DataPrinterFlags, DataTree, DataValidationFlags,
+    DataPrinterFlags, DataTree,
 };
 use yang5::schema::SchemaNodeKind;
 
 use crate::YANG_CTX;
 use crate::error::CallbackError;
-use crate::grpc::proto;
 use crate::parser::ParsedArgs;
 use crate::session::{CommandMode, ConfigurationType, Session};
 use crate::token::{Commands, TokenKind};
@@ -28,9 +27,16 @@ const XPATH_PROTOCOL: &str =
     "/ietf-routing:routing/control-plane-protocols/control-plane-protocol";
 const XPATH_RIB: &str = "/ietf-routing:routing/ribs/rib";
 
+// Type of data to retrieve from the daemon.
+#[derive(Clone, Copy, Debug)]
+enum DataType {
+    State,
+    All,
+}
+
 struct YangTableBuilder<'a> {
     session: &'a mut Session,
-    data_type: proto::get_request::DataType,
+    data_type: DataType,
     paths: Vec<(String, Vec<YangTableColumn>)>,
 }
 
@@ -54,10 +60,7 @@ enum YangValueDisplayFormat {
 
 impl<'a> YangTableBuilder<'a> {
     // Initializes the builder.
-    pub fn new(
-        session: &'a mut Session,
-        data_type: proto::get_request::DataType,
-    ) -> Self {
+    pub fn new(session: &'a mut Session, data_type: DataType) -> Self {
         Self {
             session,
             data_type,
@@ -260,22 +263,21 @@ fn write_output(
 
 fn fetch_data(
     session: &mut Session,
-    data_type: proto::get_request::DataType,
+    data_type: DataType,
     xpath: &str,
 ) -> Result<DataTree<'static>, String> {
-    let yang_ctx = YANG_CTX.get().unwrap();
-    let data_format = DataFormat::LYB;
-    let data = session
-        .get(data_type, data_format, true, Some(xpath.to_owned()))
+    let mut data = session
+        .get_state(true, Some(xpath.to_owned()))
         .map_err(|error| format!("% failed to fetch state data: {}", error))?;
-    DataTree::parse_string(
-        yang_ctx,
-        data.as_bytes().unwrap(),
-        data_format,
-        DataParserFlags::NO_VALIDATION,
-        DataValidationFlags::PRESENT,
-    )
-    .map_err(|error| format!("% failed to parse data: {}", error))
+    if let DataType::All = data_type {
+        let config = session.get_config(true, Some(xpath.to_owned())).map_err(
+            |error| format!("% failed to fetch configuration data: {}", error),
+        )?;
+        data.merge(&config).map_err(|error| {
+            format!("% failed to merge configuration data: {}", error)
+        })?;
+    }
+    Ok(data)
 }
 
 // ===== impl DataNodeRef =====
@@ -645,12 +647,15 @@ pub fn cmd_show_state(
         None => DataFormat::JSON,
     };
 
-    match session.get(proto::get_request::DataType::State, format, false, xpath)
-    {
-        Ok(proto::data_tree::Data::DataString(data)) => {
+    match session.get_state(false, xpath) {
+        Ok(dtree) => {
+            let data = dtree
+                .print_string(format, DataPrinterFlags::WITH_SIBLINGS)
+                .map_err(|error| {
+                    format!("% failed to print state data: {}", error)
+                })?;
             write_output(session, &data)?;
         }
-        Ok(proto::data_tree::Data::DataBytes(_)) => unreachable!(),
         Err(error) => println!("% failed to fetch state data: {}", error),
     }
 
@@ -710,7 +715,7 @@ pub fn cmd_show_isis_interface(
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, CallbackError> {
-    YangTableBuilder::new(session, proto::get_request::DataType::All)
+    YangTableBuilder::new(session, DataType::All)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_ISIS))
         .column_leaf("Instance", "name")
@@ -731,7 +736,7 @@ pub fn cmd_show_isis_adjacency(
     mut args: ParsedArgs,
 ) -> Result<bool, CallbackError> {
     let hostnames = isis_hostnames(session)?;
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_ISIS))
         .column_leaf("Instance", "name")
@@ -761,7 +766,7 @@ pub fn cmd_show_isis_database(
     _args: ParsedArgs,
 ) -> Result<bool, CallbackError> {
     let hostnames = isis_hostnames(session)?;
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_ISIS))
         .column_leaf("Instance", "name")
@@ -792,7 +797,7 @@ pub fn cmd_show_isis_route(
     session: &mut Session,
     _args: ParsedArgs,
 ) -> Result<bool, CallbackError> {
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_ISIS))
         .column_leaf("Instance", "name")
@@ -817,8 +822,7 @@ fn isis_hostnames(
     );
 
     // Fetch hostname mappings.
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, &xpath)?;
+    let data = fetch_data(session, DataType::State, &xpath)?;
 
     // Collect hostname mappings into a binary tree.
     let hostnames = data
@@ -866,7 +870,7 @@ pub fn cmd_show_ospf_interface(
         "ospfv3" => PROTOCOL_OSPFV3,
         _ => unreachable!(),
     };
-    YangTableBuilder::new(session, proto::get_request::DataType::All)
+    YangTableBuilder::new(session, DataType::All)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -919,8 +923,7 @@ pub fn cmd_show_ospf_interface_detail(
     if let Some(name) = &name {
         xpath_iface = format!("{}[name='{}']", xpath_iface, name);
     }
-    let data =
-        fetch_data(session, proto::get_request::DataType::All, xpath_req)?;
+    let data = fetch_data(session, DataType::All, xpath_req)?;
 
     // Iterate over OSPF instances.
     for dnode in data.find_xpath(&xpath_instance).unwrap() {
@@ -975,7 +978,7 @@ pub fn cmd_show_ospf_vlink(
         _ => unreachable!(),
     };
     let hostnames = ospf_hostnames(session, protocol)?;
-    YangTableBuilder::new(session, proto::get_request::DataType::All)
+    YangTableBuilder::new(session, DataType::All)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1016,7 +1019,7 @@ pub fn cmd_show_ospf_neighbor(
         _ => unreachable!(),
     };
     let hostnames = ospf_hostnames(session, protocol)?;
-    YangTableBuilder::new(session, proto::get_request::DataType::All)
+    YangTableBuilder::new(session, DataType::All)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1077,8 +1080,7 @@ pub fn cmd_show_ospf_neighbor_detail(
         xpath_nbr =
             format!("{}[neighbor-router-id='{}']", xpath_nbr, router_id);
     }
-    let data =
-        fetch_data(session, proto::get_request::DataType::All, xpath_req)?;
+    let data = fetch_data(session, DataType::All, xpath_req)?;
 
     // Iterate over OSPF instances.
     let output = session.writer();
@@ -1151,7 +1153,7 @@ pub fn cmd_show_ospf_database_as(
         _ => unreachable!(),
     };
     let hostnames = ospf_hostnames(session, protocol)?;
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1194,7 +1196,7 @@ pub fn cmd_show_ospf_database_area(
         _ => unreachable!(),
     };
     let hostnames = ospf_hostnames(session, protocol)?;
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1239,7 +1241,7 @@ pub fn cmd_show_ospf_database_link(
         _ => unreachable!(),
     };
     let hostnames = ospf_hostnames(session, protocol)?;
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1285,7 +1287,7 @@ pub fn cmd_show_ospf_route(
         "ospfv3" => PROTOCOL_OSPFV3,
         _ => unreachable!(),
     };
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1314,7 +1316,7 @@ pub fn cmd_show_ospf_hostnames(
         _ => unreachable!(),
     };
 
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1336,8 +1338,7 @@ fn ospf_hostnames(
     );
 
     // Fetch hostname mappings.
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, &xpath)?;
+    let data = fetch_data(session, DataType::State, &xpath)?;
 
     // Collect hostname mappings into a binary tree.
     let hostnames = data
@@ -1375,7 +1376,7 @@ pub fn cmd_show_rip_interface(
         "ripng" => PROTOCOL_RIPNG,
         _ => unreachable!(),
     };
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1416,8 +1417,7 @@ pub fn cmd_show_rip_interface_detail(
         xpath_iface = format!("{}[interface='{}']", xpath_iface, name);
     }
 
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
+    let data = fetch_data(session, DataType::State, xpath_req)?;
 
     // Iterate over RIP instances.
     let output = session.writer();
@@ -1471,7 +1471,7 @@ pub fn cmd_show_rip_neighbor(
 
     let xpath_rip_neighbor = format!("ietf-rip:rip/{}/neighbors/neighbor", afi);
 
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1513,8 +1513,7 @@ pub fn cmd_show_rip_neighbor_detail(
             format!("{}[{}='{}']", xpath_neighbor, address, nb_address);
     }
 
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
+    let data = fetch_data(session, DataType::State, xpath_req)?;
 
     // Iterate over RIP instances.
     let output = session.writer();
@@ -1558,7 +1557,7 @@ pub fn cmd_show_rip_route(
 
     let xpath_rip_rib = format!("ietf-rip:rip/{}/routes/route", afi);
 
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(protocol))
         .column_leaf("Instance", "name")
@@ -1596,7 +1595,7 @@ pub fn cmd_show_mpls_ldp_discovery(
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, CallbackError> {
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
         .column_leaf("Instance", "name")
@@ -1636,8 +1635,7 @@ pub fn cmd_show_mpls_ldp_discovery_detail(
     // when find_xpath is invoked current node is address-families
     let xpath_adjacency = "ipv4/hello-adjacencies/hello-adjacency".to_owned();
 
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
+    let data = fetch_data(session, DataType::State, xpath_req)?;
 
     // Iterate over MPLS LDP instances.
     let output = session.writer();
@@ -1706,7 +1704,7 @@ pub fn cmd_show_mpls_ldp_peer(
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, CallbackError> {
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
         .column_leaf("Instance", "name")
@@ -1747,8 +1745,7 @@ pub fn cmd_show_mpls_ldp_peer_detail(
 
     let xpath_capability = "capability".to_owned();
 
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, xpath_req)?;
+    let data = fetch_data(session, DataType::State, xpath_req)?;
 
     // Iterate over MPLS LDP instances.
     let output = session.writer();
@@ -1878,7 +1875,7 @@ pub fn cmd_show_mpls_ldp_binding_address(
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, CallbackError> {
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
         .column_leaf("Instance", "name")
@@ -1912,7 +1909,7 @@ pub fn cmd_show_mpls_ldp_binding_fec(
     session: &mut Session,
     mut args: ParsedArgs,
 ) -> Result<bool, CallbackError> {
-    YangTableBuilder::new(session, proto::get_request::DataType::State)
+    YangTableBuilder::new(session, DataType::State)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_MPLS_LDP))
         .column_leaf("Instance", "name")
@@ -1994,7 +1991,7 @@ pub fn cmd_show_bgp_summary(
 
     let afi_xpath = format!("afi-safis/afi-safi[name='{}']/prefixes", afi);
 
-    YangTableBuilder::new(session, proto::get_request::DataType::All)
+    YangTableBuilder::new(session, DataType::All)
         .xpath(XPATH_PROTOCOL)
         .filter_list_key("type", Some(PROTOCOL_BGP))
         .column_leaf("Instance", "name")
@@ -2049,8 +2046,7 @@ fn bgp_get_attrs(
         XPATH_PROTOCOL, PROTOCOL_BGP, "main", XPATH_BGP_RIB_ATTR_SET
     );
 
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, &xpath)?;
+    let data = fetch_data(session, DataType::State, &xpath)?;
 
     let attributes = data
         .find_path(&xpath)
@@ -2132,8 +2128,7 @@ pub fn cmd_show_bgp_neighbor(
         rt_type
     );
 
-    let data =
-        fetch_data(session, proto::get_request::DataType::State, &xpath_req)?;
+    let data = fetch_data(session, DataType::State, &xpath_req)?;
 
     let xpath_routes = format!("{}/route", &xpath_req);
 
@@ -2181,11 +2176,7 @@ pub fn cmd_show_bgp_neighbor_detail(
             format!("{}[remote-address='{}']", xpath_neighbor, addr);
     }
 
-    let data = fetch_data(
-        session,
-        proto::get_request::DataType::All,
-        &xpath_bgp_instance,
-    )?;
+    let data = fetch_data(session, DataType::All, &xpath_bgp_instance)?;
 
     let output = session.writer();
     for dnode_inst in data.find_xpath(&xpath_bgp_instance).unwrap() {
@@ -2517,8 +2508,7 @@ pub fn cmd_show_route(
     let fetch_xpath = format!("{}[name='{}']", XPATH_RIB, rib_name);
     let route_xpath = format!("{}/routes/route", fetch_xpath);
 
-    let data =
-        fetch_data(session, proto::get_request::DataType::All, &fetch_xpath)?;
+    let data = fetch_data(session, DataType::All, &fetch_xpath)?;
 
     let Some(dnode) = data.reference() else {
         return Ok(false);

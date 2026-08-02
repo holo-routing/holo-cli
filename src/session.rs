@@ -7,16 +7,14 @@
 use derive_new::new;
 use enum_as_inner::EnumAsInner;
 use indextree::NodeId;
-use yang5::data::{
-    Data, DataFormat, DataParserFlags, DataTree, DataValidationFlags,
-};
+use yang5::data::{Data, DataTree, DataValidationFlags};
 use yang5::schema::{SchemaNode, SchemaNodeKind};
 
 use crate::error::Error;
 use crate::grpc::{GrpcClient, proto};
 use crate::parser::ParsedArgs;
 use crate::token::Commands;
-use crate::{YANG_CTX, token_yang};
+use crate::token_yang;
 
 static DEFAULT_HOSTNAME: &str = "holo";
 
@@ -54,24 +52,9 @@ pub enum ConfigurationType {
 
 impl Session {
     pub fn new(use_pager: bool, mut grpc_client: GrpcClient) -> Session {
-        let yang_ctx = YANG_CTX.get().unwrap();
-        let data_format = DataFormat::LYB;
         let running = grpc_client
-            .get(
-                proto::get_request::DataType::Config,
-                data_format,
-                false,
-                None,
-            )
-            .unwrap();
-        let running = DataTree::parse_string(
-            yang_ctx,
-            running.as_bytes().unwrap(),
-            data_format,
-            DataParserFlags::empty(),
-            DataValidationFlags::PRESENT | DataValidationFlags::NO_STATE,
-        )
-        .expect("Failed to parse data tree");
+            .get_config(false, None)
+            .expect("Failed to fetch running configuration");
 
         Session {
             hostname: DEFAULT_HOSTNAME.to_owned(),
@@ -308,15 +291,20 @@ impl Session {
         }
     }
 
-    pub fn get(
+    pub fn get_config(
         &mut self,
-        data_type: proto::get_request::DataType,
-        format: DataFormat,
         with_defaults: bool,
         xpath: Option<String>,
-    ) -> Result<proto::data_tree::Data, Error> {
-        self.grpc_client
-            .get(data_type, format, with_defaults, xpath)
+    ) -> Result<DataTree<'static>, Error> {
+        self.grpc_client.get_config(with_defaults, xpath)
+    }
+
+    pub fn get_state(
+        &mut self,
+        with_defaults: bool,
+        xpath: Option<String>,
+    ) -> Result<DataTree<'static>, Error> {
+        self.grpc_client.get_state(with_defaults, xpath)
     }
 
     pub fn execute(
