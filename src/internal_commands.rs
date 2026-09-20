@@ -825,11 +825,14 @@ fn isis_hostnames(
     let data = fetch_data(session, DataType::State, &xpath)?;
 
     // Collect hostname mappings into a binary tree.
-    let hostnames = data
-        .find_path(&xpath)
-        .unwrap()
+    //
+    // An instance that mapped no hostnames has no container to look under.
+    let Ok(dnode) = data.find_path(&xpath) else {
+        return Ok(BTreeMap::new());
+    };
+    let hostnames = dnode
         .find_xpath("hostname")
-        .unwrap()
+        .map_err(|error| format!("% failed to fetch hostnames: {}", error))?
         .filter_map(|dnode| {
             Some((
                 dnode.child_opt_value("system-id")?,
@@ -1341,11 +1344,14 @@ fn ospf_hostnames(
     let data = fetch_data(session, DataType::State, &xpath)?;
 
     // Collect hostname mappings into a binary tree.
-    let hostnames = data
-        .find_path(&xpath)
-        .unwrap()
+    //
+    // An instance that mapped no hostnames has no container to look under.
+    let Ok(dnode) = data.find_path(&xpath) else {
+        return Ok(BTreeMap::new());
+    };
+    let hostnames = dnode
         .find_xpath("hostname")
-        .unwrap()
+        .map_err(|error| format!("% failed to fetch hostnames: {}", error))?
         .filter_map(|dnode| {
             Some((
                 dnode.child_opt_value("router-id")?,
