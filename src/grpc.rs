@@ -185,7 +185,7 @@ impl GrpcClient {
             .into_inner();
         data_tree_parse(
             response.data.as_ref(),
-            DataParserFlags::empty(),
+            DataParserFlags::NO_VALIDATION,
             DataValidationFlags::PRESENT | DataValidationFlags::NO_STATE,
         )
     }
