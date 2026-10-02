@@ -2548,20 +2548,38 @@ pub fn cmd_show_route(
         )
         .unwrap();
 
-        let nh_addr = route.relative_opt_value("next-hop/next-hop-address");
-        let nh_iface = route.relative_opt_value("next-hop/outgoing-interface");
-        match (nh_addr, nh_iface) {
-            (Some(addr), Some(iface)) => {
-                writeln!(output, "{:>20} >  to {} via {}", "", addr, iface)
-                    .unwrap();
+        // A route with a single nexthop has it in the simple-next-hop case,
+        // and one with several (ECMP) in the next-hop-list case, where the
+        // address leaf is named "address" rather than "next-hop-address".
+        let mut nexthops = vec![(
+            route.relative_opt_value("next-hop/next-hop-address"),
+            route.relative_opt_value("next-hop/outgoing-interface"),
+        )];
+        nexthops.extend(
+            route
+                .find_xpath("next-hop/next-hop-list/next-hop")
+                .unwrap()
+                .map(|nexthop| {
+                    (
+                        nexthop.child_opt_value("address"),
+                        nexthop.child_opt_value("outgoing-interface"),
+                    )
+                }),
+        );
+        for (nh_addr, nh_iface) in nexthops {
+            match (nh_addr, nh_iface) {
+                (Some(addr), Some(iface)) => {
+                    writeln!(output, "{:>20} >  to {} via {}", "", addr, iface)
+                        .unwrap();
+                }
+                (Some(addr), None) => {
+                    writeln!(output, "{:>20} >  to {}", "", addr).unwrap();
+                }
+                (None, Some(iface)) => {
+                    writeln!(output, "{:>20} >  via {}", "", iface).unwrap();
+                }
+                (None, None) => {}
             }
-            (Some(addr), None) => {
-                writeln!(output, "{:>20} >  to {}", "", addr).unwrap();
-            }
-            (None, Some(iface)) => {
-                writeln!(output, "{:>20} >  via {}", "", iface).unwrap();
-            }
-            (None, None) => {}
         }
     }
 
